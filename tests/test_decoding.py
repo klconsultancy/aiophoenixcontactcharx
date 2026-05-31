@@ -177,7 +177,9 @@ class TestVehicleStatus:
         with caplog.at_level(logging.WARNING, logger="aiophoenixcontactcharx.client"):
             result = _vehicle_status(0x5858)  # "XX" — not a valid IEC code
         assert result == VehicleStatus.IN
-        assert "WARNING" in caplog.text or len(caplog.records) > 0
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "XX" in caplog.records[0].message
 
 
 # ---------------------------------------------------------------------------

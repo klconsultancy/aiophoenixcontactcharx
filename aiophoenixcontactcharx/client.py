@@ -92,7 +92,7 @@ def _ascii(regs: list[int], offset: int, num_words: int) -> str:
     return "".join(chars).rstrip("\x00").strip()
 
 
-def _vehicle_status(reg: int) -> "VehicleStatus":
+def _vehicle_status(reg: int) -> VehicleStatus:
     """Decode 2-char IEC 61851-1 status from a single 16-bit register."""
     high = (reg >> 8) & 0xFF
     low = reg & 0xFF
