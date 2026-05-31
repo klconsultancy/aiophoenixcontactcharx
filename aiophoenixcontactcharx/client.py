@@ -375,6 +375,8 @@ class CharxClient:
 
         Makes 1 + 2×num_charging_points Modbus requests total.
         """
+        if not 1 <= num_charging_points <= 48:
+            raise ValueError(f"num_charging_points must be 1–48, got {num_charging_points}")
         device_info = await self.get_device_info()
         charging_points: list[ChargingPointData] = []
         for cp in range(1, num_charging_points + 1):
@@ -437,7 +439,7 @@ class CharxClient:
         If no new value is written within timer_s seconds the device falls
         back to fallback_current_a. Set timer_s=65535 to disable.
         """
-        if not 6 <= fallback_current_a <= 80:
+        if timer_s != 65535 and not 6 <= fallback_current_a <= 80:
             raise ValueError(f"Watchdog fallback current must be 6–80 A, got {fallback_current_a}")
         await self._write_register(
             cp_register(charging_point, 306), fallback_current_a

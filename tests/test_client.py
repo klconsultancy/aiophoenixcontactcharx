@@ -267,6 +267,16 @@ class TestGetChargingPointStatus:
 # ---------------------------------------------------------------------------
 
 class TestFetchData:
+    async def test_num_charging_points_above_max_raises(self, mock_pymodbus):
+        async with CharxClient("192.168.1.1") as client:
+            with pytest.raises(ValueError, match="1–48"):
+                await client.fetch_data(num_charging_points=49)
+
+    async def test_num_charging_points_zero_raises(self, mock_pymodbus):
+        async with CharxClient("192.168.1.1") as client:
+            with pytest.raises(ValueError, match="1–48"):
+                await client.fetch_data(num_charging_points=0)
+
     async def test_request_count(self, mock_pymodbus):
         """1 global + 2 per CP (config + status) = 3 requests for 1 CP."""
         mock_pymodbus.read_holding_registers = AsyncMock(side_effect=[
@@ -459,6 +469,14 @@ class TestControlWrites:
         async with CharxClient("192.168.1.1") as client:
             await client.set_watchdog(1, timer_s=60, fallback_current_a=6)
             await client.set_watchdog(1, timer_s=60, fallback_current_a=80)
+
+    async def test_set_watchdog_disable_with_zero_current_accepted(self, mock_pymodbus):
+        mock_pymodbus.write_register = AsyncMock(
+            return_value=MagicMock(isError=lambda: False)
+        )
+        async with CharxClient("192.168.1.1") as client:
+            # timer_s=65535 disables the watchdog; fallback_current_a is irrelevant
+            await client.set_watchdog(1, timer_s=65535, fallback_current_a=0)
 
     async def test_write_modbus_error_raises(self, mock_pymodbus):
         err_resp = MagicMock()

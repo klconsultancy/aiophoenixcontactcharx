@@ -31,7 +31,7 @@ The per-session authorization signal for one Charging Point. When enabled in Mod
 _Avoid_: enable charging, start charging, charge enable
 
 **Availability**:
-Whether a Charging Point is in service. Setting a Charging Point unavailable puts it into IEC 61851-1 status F ("not available") and aborts any active Session. This is a deliberate operational state — distinct from a fault (`E0`). Distinct from Charging Release, which operates at the session level.
+Whether a Charging Point is in service. Setting a Charging Point unavailable puts it into IEC 61851-1 status F ("not available") and aborts any active Session. This is a deliberate operational state — distinct from a fault (`E0`). A Charging Point in status F may still report `is_connected=True` per IEC 61851-1 (a vehicle may remain physically plugged in); callers should check `is_unavailable` rather than `is_connected` to determine whether the point is in service. Distinct from Charging Release, which operates at the session level.
 _Avoid_: enabled, active, online
 
 ### Charging lifecycle
