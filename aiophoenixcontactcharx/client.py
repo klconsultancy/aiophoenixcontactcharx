@@ -338,7 +338,7 @@ class CharxClient:
             current_l1_ma=_maybe_phase_current(regs, 6),
             current_l2_ma=_maybe_phase_current(regs, 8),
             current_l3_ma=_maybe_phase_current(regs, 10),
-            active_power_mw=_s32(regs, 12),
+            active_power_mw=_u32(regs, 12),
             reactive_power_mvar=_s32(regs, 14),
             apparent_power_mva=_u32(regs, 16),
             energy_active_wh=_u64(regs, 18),
@@ -437,6 +437,8 @@ class CharxClient:
         If no new value is written within timer_s seconds the device falls
         back to fallback_current_a. Set timer_s=65535 to disable.
         """
+        if not 6 <= fallback_current_a <= 80:
+            raise ValueError(f"Watchdog fallback current must be 6–80 A, got {fallback_current_a}")
         await self._write_register(
             cp_register(charging_point, 306), fallback_current_a
         )

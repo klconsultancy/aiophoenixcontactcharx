@@ -4,6 +4,7 @@ These functions are pure (no I/O) so they run without any Modbus connection.
 """
 
 import pytest
+from aiophoenixcontactcharx.registers import cp_register
 from aiophoenixcontactcharx.client import (
     _ascii,
     _ip,
@@ -214,3 +215,26 @@ class TestMaybePhaseCurrentSentinel:
         hi = (ma >> 16) & 0xFFFF
         lo = ma & 0xFFFF
         assert _maybe_phase_current([hi, lo], 0) == ma
+
+
+# ---------------------------------------------------------------------------
+# cp_register
+# ---------------------------------------------------------------------------
+
+class TestCpRegister:
+    def test_cp1_offset_299(self):
+        assert cp_register(1, 299) == 1299
+
+    def test_cp12_offset_100(self):
+        assert cp_register(12, 100) == 12100
+
+    def test_cp48_boundary(self):
+        assert cp_register(48, 300) == 48300
+
+    def test_cp0_raises(self):
+        with pytest.raises(ValueError, match="1–48"):
+            cp_register(0, 299)
+
+    def test_cp49_raises(self):
+        with pytest.raises(ValueError, match="1–48"):
+            cp_register(49, 299)

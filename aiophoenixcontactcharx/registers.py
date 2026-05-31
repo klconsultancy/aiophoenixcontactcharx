@@ -122,4 +122,6 @@ def cp_register(charging_point: int, offset: int) -> int:
     charging_point: 1-indexed controller number (matches x in xNNN notation).
     offset: the per-CP register offset (e.g. CP_VEHICLE_STATUS = 299).
     """
+    if not 1 <= charging_point <= 48:
+        raise ValueError(f"charging_point must be 1–48, got {charging_point}")
     return charging_point * 1000 + offset
