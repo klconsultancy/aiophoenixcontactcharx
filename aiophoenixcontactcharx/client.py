@@ -27,6 +27,7 @@ from .models import (
     ModemSignalQuality,
     ReleaseMode,
     TempMonitoring,
+    VehicleStatus,
 )
 from .registers import (
     CP_CFG_COUNT,
@@ -91,13 +92,18 @@ def _ascii(regs: list[int], offset: int, num_words: int) -> str:
     return "".join(chars).rstrip("\x00").strip()
 
 
-def _vehicle_status(reg: int) -> str:
+def _vehicle_status(reg: int) -> "VehicleStatus":
     """Decode 2-char IEC 61851-1 status from a single 16-bit register."""
     high = (reg >> 8) & 0xFF
     low = reg & 0xFF
     if high and low:
-        return chr(high) + chr(low)
-    return "A1"
+        code = chr(high) + chr(low)
+        try:
+            return VehicleStatus(code)
+        except ValueError:
+            _LOGGER.warning("Unrecognised vehicle status code %r from register; defaulting to IN", code)
+            return VehicleStatus.IN
+    return VehicleStatus.A1
 
 
 def _ip(regs: list[int], offset: int) -> str:

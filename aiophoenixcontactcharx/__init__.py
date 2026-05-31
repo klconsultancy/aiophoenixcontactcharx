@@ -20,6 +20,7 @@ from .models import (
     ModemSignalQuality,
     ReleaseMode,
     TempMonitoring,
+    VehicleStatus,
 )
 
 __version__ = "0.1.3"
@@ -42,4 +43,5 @@ __all__ = [
     "ModemSignalQuality",
     "ReleaseMode",
     "TempMonitoring",
+    "VehicleStatus",
 ]

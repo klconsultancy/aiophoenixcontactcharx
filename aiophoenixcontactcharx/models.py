@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import IntEnum
+from enum import IntEnum, StrEnum
 
 
 # ---------------------------------------------------------------------------
@@ -54,20 +54,19 @@ class TempMonitoring(IntEnum):
     PTC = 2
 
 
-# IEC 61851-1 vehicle states as returned by register X299 (two ASCII chars).
-VEHICLE_STATUS_DESCRIPTIONS: dict[str, str] = {
-    "A1": "Not connected — supply available",
-    "A2": "Not connected — supply not available",
-    "B1": "Connected — supply available",
-    "B2": "Connected — supply not available",
-    "C1": "Charging request — no ventilation required",
-    "C2": "Charging active",
-    "D1": "Charging request with ventilation — no ventilation available",
-    "D2": "Charging active with ventilation",
-    "E0": "Error",
-    "F0": "Not available (status F)",
-    "IN": "Initialising",
-}
+class VehicleStatus(StrEnum):
+    """IEC 61851-1 two-character state codes reported by register X299."""
+    A1 = "A1"  # Not connected — supply available
+    A2 = "A2"  # Not connected — supply not available
+    B1 = "B1"  # Connected — supply available
+    B2 = "B2"  # Connected — supply not available
+    C1 = "C1"  # Charging request — no ventilation required
+    C2 = "C2"  # Charging active
+    D1 = "D1"  # Charging request with ventilation — no ventilation available
+    D2 = "D2"  # Charging active with ventilation
+    E0 = "E0"  # Error
+    F0 = "F0"  # Not available (status F)
+    IN = "IN"  # Initialising
 
 
 # ---------------------------------------------------------------------------
@@ -189,7 +188,7 @@ class ChargingPointStatus:
     setpoint_percent: int = 0
     setpoint_a: int = 0
     cable_capacity_a: int = 0
-    vehicle_status: str = "A1"
+    vehicle_status: VehicleStatus = VehicleStatus.A1
 
     # Derived property helpers
     @property
