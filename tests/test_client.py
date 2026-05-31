@@ -11,7 +11,15 @@ from aiophoenixcontactcharx import (
     CharxConnectionError,
     CharxModbusError,
 )
-from aiophoenixcontactcharx.models import ReleaseMode
+import logging
+
+from aiophoenixcontactcharx.models import (
+    EnergyMeterType,
+    ModemRegistration,
+    ModemSignalQuality,
+    ReleaseMode,
+    TempMonitoring,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -194,6 +202,36 @@ class TestGetDeviceInfo:
         assert info.dynamic_max_current_a == 16
         assert info.availability is True
 
+    async def test_unrecognised_modem_registration_logs_warning(self, mock_pymodbus, caplog):
+        regs = _global_regs()
+        regs[45] = 99  # not a valid ModemRegistration value
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        with caplog.at_level(logging.WARNING, logger="aiophoenixcontactcharx.client"):
+            async with CharxClient("192.168.1.1") as client:
+                info = await client.get_device_info()
+
+        assert info.modem_registration == ModemRegistration.UNKNOWN
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "99" in caplog.records[0].message
+
+    async def test_unrecognised_modem_signal_quality_logs_warning(self, mock_pymodbus, caplog):
+        regs = _global_regs()
+        regs[46] = 99  # not a valid ModemSignalQuality value
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        with caplog.at_level(logging.WARNING, logger="aiophoenixcontactcharx.client"):
+            async with CharxClient("192.168.1.1") as client:
+                info = await client.get_device_info()
+
+        assert info.modem_signal_quality == ModemSignalQuality.UNKNOWN
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "99" in caplog.records[0].message
+
     async def test_modbus_error_raises(self, mock_pymodbus):
         err_resp = MagicMock()
         err_resp.isError.return_value = True
@@ -279,6 +317,51 @@ class TestGetChargingPointConfig:
                 config = await client.get_charging_point_config(1)
 
         assert config.overcurrent_monitoring == OvercurrentMonitoring.OFF
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "99" in caplog.records[0].message
+
+    async def test_unrecognised_energy_meter_type_logs_warning(self, mock_pymodbus, caplog):
+        regs = _cp_cfg_regs()
+        regs[12] = 99  # not a valid EnergyMeterType value
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        with caplog.at_level(logging.WARNING, logger="aiophoenixcontactcharx.client"):
+            async with CharxClient("192.168.1.1") as client:
+                config = await client.get_charging_point_config(1)
+
+        assert config.energy_meter_type == EnergyMeterType.UNKNOWN
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "99" in caplog.records[0].message
+
+    async def test_unrecognised_temp_monitoring_logs_warning(self, mock_pymodbus, caplog):
+        regs = _cp_cfg_regs()
+        regs[8] = 99  # not a valid TempMonitoring value
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        with caplog.at_level(logging.WARNING, logger="aiophoenixcontactcharx.client"):
+            async with CharxClient("192.168.1.1") as client:
+                config = await client.get_charging_point_config(1)
+
+        assert config.temp_monitoring == TempMonitoring.INACTIVE
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "99" in caplog.records[0].message
+
+    async def test_unrecognised_release_mode_logs_warning(self, mock_pymodbus, caplog):
+        regs = _cp_cfg_regs()
+        regs[20] = 99  # not a valid ReleaseMode value
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        with caplog.at_level(logging.WARNING, logger="aiophoenixcontactcharx.client"):
+            async with CharxClient("192.168.1.1") as client:
+                config = await client.get_charging_point_config(1)
+
+        assert config.release_mode == ReleaseMode.DASHBOARD
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert "99" in caplog.records[0].message
