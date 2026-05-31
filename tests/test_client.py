@@ -204,6 +204,63 @@ class TestGetDeviceInfo:
 
 
 # ---------------------------------------------------------------------------
+# get_charging_point_config
+# ---------------------------------------------------------------------------
+
+class TestGetChargingPointConfig:
+    async def test_parses_proximity_cfg(self, mock_pymodbus):
+        regs = _cp_cfg_regs()
+        regs[10] = 0   # proximity_cfg = 0 (IEC 61851-1)
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        async with CharxClient("192.168.1.1") as client:
+            config = await client.get_charging_point_config(1)
+
+        assert config.proximity_cfg == 0
+
+    async def test_parses_overcurrent_monitoring_off(self, mock_pymodbus):
+        regs = _cp_cfg_regs()
+        regs[11] = 0   # OFF
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        from aiophoenixcontactcharx.models import OvercurrentMonitoring
+        async with CharxClient("192.168.1.1") as client:
+            config = await client.get_charging_point_config(1)
+
+        assert config.overcurrent_monitoring == OvercurrentMonitoring.OFF
+
+    async def test_parses_overcurrent_monitoring_pct120(self, mock_pymodbus):
+        regs = _cp_cfg_regs()
+        regs[11] = 1   # PCT120_10S
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        from aiophoenixcontactcharx.models import OvercurrentMonitoring
+        async with CharxClient("192.168.1.1") as client:
+            config = await client.get_charging_point_config(1)
+
+        assert config.overcurrent_monitoring == OvercurrentMonitoring.PCT120_10S
+
+    async def test_unrecognised_overcurrent_falls_back_to_off(self, mock_pymodbus, caplog):
+        regs = _cp_cfg_regs()
+        regs[11] = 99  # unknown value
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        import logging
+        from aiophoenixcontactcharx.models import OvercurrentMonitoring
+        with caplog.at_level(logging.WARNING, logger="aiophoenixcontactcharx.client"):
+            async with CharxClient("192.168.1.1") as client:
+                config = await client.get_charging_point_config(1)
+
+        assert config.overcurrent_monitoring == OvercurrentMonitoring.OFF
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+
+
+# ---------------------------------------------------------------------------
 # get_charging_point_status_and_control
 # ---------------------------------------------------------------------------
 

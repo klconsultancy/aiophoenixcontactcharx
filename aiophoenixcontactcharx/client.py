@@ -25,6 +25,7 @@ from .models import (
     EnergyMeterType,
     ModemRegistration,
     ModemSignalQuality,
+    OvercurrentMonitoring,
     ReleaseMode,
     TempMonitoring,
     VehicleStatus,
@@ -104,6 +105,14 @@ def _vehicle_status(reg: int) -> VehicleStatus:
             _LOGGER.warning("Unrecognised vehicle status code %r from register; defaulting to IN", code)
             return VehicleStatus.IN
     return VehicleStatus.A1
+
+
+def _overcurrent_monitoring(raw: int) -> OvercurrentMonitoring:
+    """Decode overcurrent monitoring mode; warn and fall back to OFF for unknown values."""
+    if raw in OvercurrentMonitoring._value2member_map_:
+        return OvercurrentMonitoring(raw)
+    _LOGGER.warning("Unrecognised overcurrent monitoring value %d; defaulting to OFF", raw)
+    return OvercurrentMonitoring.OFF
 
 
 def _ip(regs: list[int], offset: int) -> str:
@@ -320,6 +329,8 @@ class CharxClient:
                 regs[8] if regs[8] in TempMonitoring._value2member_map_ else 0
             ),
             accept_status_d=bool(regs[9]),
+            proximity_cfg=regs[10],
+            overcurrent_monitoring=_overcurrent_monitoring(regs[11]),
             energy_meter_type=meter_type,
             uid=_ascii(regs, 13, 3),
             server_uid=_ascii(regs, 16, 3),

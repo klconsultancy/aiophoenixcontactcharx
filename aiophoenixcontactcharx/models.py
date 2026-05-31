@@ -48,6 +48,12 @@ class ModemSignalQuality(IntEnum):
     EXCELLENT = 5
 
 
+class OvercurrentMonitoring(IntEnum):
+    OFF = 0
+    PCT120_10S = 1
+    EV_ZE_READY = 2
+
+
 class TempMonitoring(IntEnum):
     INACTIVE = 0
     PT1000 = 1
@@ -146,6 +152,8 @@ class ChargingPointConfig:
     current_derating_stop_a: int = 0
     temp_monitoring: TempMonitoring = TempMonitoring.INACTIVE
     accept_status_d: bool = False
+    proximity_cfg: int = 0
+    overcurrent_monitoring: OvercurrentMonitoring = OvercurrentMonitoring.OFF
     energy_meter_type: EnergyMeterType = EnergyMeterType.NONE
     uid: str = ""
     server_uid: str = ""
