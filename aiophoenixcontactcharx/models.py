@@ -62,6 +62,8 @@ VEHICLE_STATUS_DESCRIPTIONS: dict[str, str] = {
     "B2": "Connected — supply not available",
     "C1": "Charging request — no ventilation required",
     "C2": "Charging active",
+    "D1": "Charging request with ventilation — no ventilation available",
+    "D2": "Charging active with ventilation",
     "E0": "Error",
     "F0": "Not available (status F)",
     "IN": "Initialising",

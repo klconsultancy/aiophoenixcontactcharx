@@ -228,13 +228,17 @@ class TestCpRegister:
     def test_cp12_offset_100(self):
         assert cp_register(12, 100) == 12100
 
-    def test_cp48_boundary(self):
-        assert cp_register(48, 300) == 48300
+    def test_cp12_boundary(self):
+        assert cp_register(12, 300) == 12300
+
+    def test_cp13_raises(self):
+        with pytest.raises(ValueError, match="1–12"):
+            cp_register(13, 299)
 
     def test_cp0_raises(self):
-        with pytest.raises(ValueError, match="1–48"):
+        with pytest.raises(ValueError, match="1–12"):
             cp_register(0, 299)
 
     def test_cp49_raises(self):
-        with pytest.raises(ValueError, match="1–48"):
+        with pytest.raises(ValueError, match="1–12"):
             cp_register(49, 299)

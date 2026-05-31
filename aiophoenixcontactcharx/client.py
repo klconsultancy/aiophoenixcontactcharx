@@ -375,8 +375,8 @@ class CharxClient:
 
         Makes 1 + 2×num_charging_points Modbus requests total.
         """
-        if not 1 <= num_charging_points <= 48:
-            raise ValueError(f"num_charging_points must be 1–48, got {num_charging_points}")
+        if not 1 <= num_charging_points <= 12:
+            raise ValueError(f"num_charging_points must be 1–12, got {num_charging_points}")
         device_info = await self.get_device_info()
         charging_points: list[ChargingPointData] = []
         for cp in range(1, num_charging_points + 1):

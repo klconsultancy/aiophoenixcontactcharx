@@ -269,12 +269,12 @@ class TestGetChargingPointStatus:
 class TestFetchData:
     async def test_num_charging_points_above_max_raises(self, mock_pymodbus):
         async with CharxClient("192.168.1.1") as client:
-            with pytest.raises(ValueError, match="1–48"):
-                await client.fetch_data(num_charging_points=49)
+            with pytest.raises(ValueError, match="1–12"):
+                await client.fetch_data(num_charging_points=13)
 
     async def test_num_charging_points_zero_raises(self, mock_pymodbus):
         async with CharxClient("192.168.1.1") as client:
-            with pytest.raises(ValueError, match="1–48"):
+            with pytest.raises(ValueError, match="1–12"):
                 await client.fetch_data(num_charging_points=0)
 
     async def test_request_count(self, mock_pymodbus):
