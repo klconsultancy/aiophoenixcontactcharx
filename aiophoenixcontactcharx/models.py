@@ -254,7 +254,7 @@ class ChargingPointControl:
     digital_outputs: int = 0
     locking: bool = False
     available: bool = True
-    force_unlock_pending: bool = False
+    force_unlock_pending: bool = False  # X305: 1 while unlock in progress; firmware clears to 0
     watchdog_current_a: int = 16
     watchdog_timer_s: int = 65535       # 65535 = disabled
 
