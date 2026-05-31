@@ -237,6 +237,19 @@ class TestGetChargingPointStatus:
         assert control.available is True
         assert control.watchdog_timer_s == 65535
 
+    async def test_active_power_with_msb_set_is_positive(self, mock_pymodbus):
+        regs = _cp_status_regs()
+        # 0x80000001 = 2_147_483_649 mW unsigned; _s32 would give -2_147_483_647
+        regs[12] = 0x8000
+        regs[13] = 0x0001
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        async with CharxClient("192.168.1.1") as client:
+            status, _ = await client.get_charging_point_status_and_control(1)
+
+        assert status.active_power_w > 0
+
     async def test_register_address_for_cp2(self, mock_pymodbus):
         """Verify that CP2 reads start at address 2232, not 1232."""
         mock_pymodbus.read_holding_registers = AsyncMock(
@@ -254,6 +267,16 @@ class TestGetChargingPointStatus:
 # ---------------------------------------------------------------------------
 
 class TestFetchData:
+    async def test_num_charging_points_above_max_raises(self, mock_pymodbus):
+        async with CharxClient("192.168.1.1") as client:
+            with pytest.raises(ValueError, match="1–12"):
+                await client.fetch_data(num_charging_points=13)
+
+    async def test_num_charging_points_zero_raises(self, mock_pymodbus):
+        async with CharxClient("192.168.1.1") as client:
+            with pytest.raises(ValueError, match="1–12"):
+                await client.fetch_data(num_charging_points=0)
+
     async def test_request_count(self, mock_pymodbus):
         """1 global + 2 per CP (config + status) = 3 requests for 1 CP."""
         mock_pymodbus.read_holding_registers = AsyncMock(side_effect=[
@@ -296,6 +319,67 @@ class TestFetchData:
         assert cp.is_charging is True       # C2
         assert cp.is_connected is True
         assert cp.has_error is False
+        assert cp.is_unavailable is False
+
+    async def test_f0_is_unavailable_not_error(self, mock_pymodbus):
+        regs = _cp_status_regs()
+        regs[67] = 0x4630  # F0
+        mock_pymodbus.read_holding_registers = AsyncMock(side_effect=[
+            _make_response(_global_regs()),
+            _make_response(_cp_cfg_regs()),
+            _make_response(regs),
+        ])
+        async with CharxClient("192.168.1.1") as client:
+            data = await client.fetch_data(1)
+
+        cp = data.charging_points[0]
+        assert cp.is_unavailable is True
+        assert cp.has_error is False
+
+    async def test_e0_is_error_not_unavailable(self, mock_pymodbus):
+        regs = _cp_status_regs()
+        regs[67] = 0x4530  # E0
+        mock_pymodbus.read_holding_registers = AsyncMock(side_effect=[
+            _make_response(_global_regs()),
+            _make_response(_cp_cfg_regs()),
+            _make_response(regs),
+        ])
+        async with CharxClient("192.168.1.1") as client:
+            data = await client.fetch_data(1)
+
+        cp = data.charging_points[0]
+        assert cp.has_error is True
+        assert cp.is_unavailable is False
+
+    async def test_d2_is_charging(self, mock_pymodbus):
+        regs = _cp_status_regs()
+        regs[67] = 0x4432  # D2
+        mock_pymodbus.read_holding_registers = AsyncMock(side_effect=[
+            _make_response(_global_regs()),
+            _make_response(_cp_cfg_regs()),
+            _make_response(regs),
+        ])
+        async with CharxClient("192.168.1.1") as client:
+            data = await client.fetch_data(1)
+
+        cp = data.charging_points[0]
+        assert cp.is_charging is True
+        assert cp.is_connected is True
+
+    async def test_d1_is_not_charging(self, mock_pymodbus):
+        regs = _cp_status_regs()
+        regs[67] = 0x4431  # D1
+        mock_pymodbus.read_holding_registers = AsyncMock(side_effect=[
+            _make_response(_global_regs()),
+            _make_response(_cp_cfg_regs()),
+            _make_response(regs),
+        ])
+        async with CharxClient("192.168.1.1") as client:
+            data = await client.fetch_data(1)
+
+        cp = data.charging_points[0]
+        assert cp.is_charging is False
+        assert cp.is_connected is True
 
 
 # ---------------------------------------------------------------------------
@@ -367,6 +451,32 @@ class TestControlWrites:
         mock_pymodbus.write_register.assert_awaited_once_with(
             address=167, value=32, device_id=1
         )
+
+    async def test_set_watchdog_below_minimum_raises(self, mock_pymodbus):
+        async with CharxClient("192.168.1.1") as client:
+            with pytest.raises(ValueError, match="6–80"):
+                await client.set_watchdog(1, timer_s=60, fallback_current_a=5)
+
+    async def test_set_watchdog_above_maximum_raises(self, mock_pymodbus):
+        async with CharxClient("192.168.1.1") as client:
+            with pytest.raises(ValueError, match="6–80"):
+                await client.set_watchdog(1, timer_s=60, fallback_current_a=81)
+
+    async def test_set_watchdog_boundary_values_accepted(self, mock_pymodbus):
+        mock_pymodbus.write_register = AsyncMock(
+            return_value=MagicMock(isError=lambda: False)
+        )
+        async with CharxClient("192.168.1.1") as client:
+            await client.set_watchdog(1, timer_s=60, fallback_current_a=6)
+            await client.set_watchdog(1, timer_s=60, fallback_current_a=80)
+
+    async def test_set_watchdog_disable_with_zero_current_accepted(self, mock_pymodbus):
+        mock_pymodbus.write_register = AsyncMock(
+            return_value=MagicMock(isError=lambda: False)
+        )
+        async with CharxClient("192.168.1.1") as client:
+            # timer_s=65535 disables the watchdog; fallback_current_a is irrelevant
+            await client.set_watchdog(1, timer_s=65535, fallback_current_a=0)
 
     async def test_write_modbus_error_raises(self, mock_pymodbus):
         err_resp = MagicMock()

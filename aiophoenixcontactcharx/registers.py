@@ -71,7 +71,7 @@ CP_VOLTAGE_L3 = 236          # 2 words, uint32 [mV]
 CP_CURRENT_L1 = 238          # 2 words, int32 [mA]; −1 if phase unknown
 CP_CURRENT_L2 = 240          # 2 words, int32 [mA]
 CP_CURRENT_L3 = 242          # 2 words, int32 [mA]
-CP_ACTIVE_POWER = 244        # 2 words, int32 [mW]
+CP_ACTIVE_POWER = 244        # 2 words, uint32 [mW]
 CP_REACTIVE_POWER = 246      # 2 words, int32 [mVAR] (signed)
 CP_APPARENT_POWER = 248      # 2 words, uint32 [mVA]
 CP_ENERGY_ACTIVE = 250       # 4 words, uint64 [Wh]
@@ -122,4 +122,6 @@ def cp_register(charging_point: int, offset: int) -> int:
     charging_point: 1-indexed controller number (matches x in xNNN notation).
     offset: the per-CP register offset (e.g. CP_VEHICLE_STATUS = 299).
     """
+    if not 1 <= charging_point <= 12:
+        raise ValueError(f"charging_point must be 1–12, got {charging_point}")
     return charging_point * 1000 + offset
