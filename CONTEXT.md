@@ -7,7 +7,7 @@ Async Python library for reading and controlling Phoenix Contact CHARX SEC EV AC
 ### Hardware
 
 **Charging Controller**:
-A physical CHARX SEC unit (SEC-3xxx or SEC-1000) that manages exactly one Charging Point. The SEC-3xxx exposes a Modbus/TCP endpoint; SEC-1000 units attach to it via the backplane bus and are accessible through the SEC-3xxx's IP address.
+A CHARX SEC-3xxx unit that exposes a single Modbus/TCP endpoint and manages one or more Charging Points — its own plus any SEC-1000 backplane extension modules attached to it (up to 11). A single Charging Controller therefore hosts up to 12 Charging Points. SEC-1000 units are backplane extension modules, not standalone Charging Controllers.
 _Avoid_: controller, charger, charging station
 
 **Charging Point**:
@@ -31,7 +31,7 @@ The per-session authorization signal for one Charging Point. When enabled in Mod
 _Avoid_: enable charging, start charging, charge enable
 
 **Availability**:
-Whether a Charging Point is in service. Setting a Charging Point unavailable puts it into IEC 61851-1 status F ("not available"), aborts any active Session, and shows it as "Error" in WBM. Distinct from Charging Release, which operates at the session level.
+Whether a Charging Point is in service. Setting a Charging Point unavailable puts it into IEC 61851-1 status F ("not available") and aborts any active Session. This is a deliberate operational state — distinct from a fault (`E0`). Distinct from Charging Release, which operates at the session level.
 _Avoid_: enabled, active, online
 
 ### Charging lifecycle
