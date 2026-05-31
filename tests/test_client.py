@@ -317,6 +317,18 @@ class TestGetChargingPointStatus:
         assert control.max_current_a == 16
         assert control.available is True
         assert control.watchdog_timer_s == 65535
+        assert control.force_unlock_pending is False
+
+    async def test_force_unlock_pending_true(self, mock_pymodbus):
+        regs = _cp_status_regs()
+        regs[73] = 1   # X305 — force-unlock pending
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        async with CharxClient("192.168.1.1") as client:
+            _, control = await client.get_charging_point_status_and_control(1)
+
+        assert control.force_unlock_pending is True
 
     async def test_active_power_with_msb_set_is_positive(self, mock_pymodbus):
         regs = _cp_status_regs()

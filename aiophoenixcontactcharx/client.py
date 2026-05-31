@@ -382,6 +382,7 @@ class CharxClient:
             digital_outputs=regs[70],
             locking=bool(regs[71]),
             available=bool(regs[72]),
+            force_unlock_pending=bool(regs[73]),
             watchdog_current_a=regs[74],
             watchdog_timer_s=regs[75],
         )
