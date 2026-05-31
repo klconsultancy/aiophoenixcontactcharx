@@ -3,7 +3,9 @@
 These functions are pure (no I/O) so they run without any Modbus connection.
 """
 
+import logging
 import pytest
+from aiophoenixcontactcharx.models import VehicleStatus
 from aiophoenixcontactcharx.registers import cp_register
 from aiophoenixcontactcharx.client import (
     _ascii,
@@ -150,21 +152,34 @@ class TestAscii:
 
 class TestVehicleStatus:
     @pytest.mark.parametrize("code,expected", [
-        (0x4131, "A1"),
-        (0x4132, "A2"),
-        (0x4231, "B1"),
-        (0x4232, "B2"),
-        (0x4331, "C1"),
-        (0x4332, "C2"),
-        (0x4530, "E0"),
-        (0x4630, "F0"),
-        (0x494E, "IN"),
+        (0x4131, VehicleStatus.A1),
+        (0x4132, VehicleStatus.A2),
+        (0x4231, VehicleStatus.B1),
+        (0x4232, VehicleStatus.B2),
+        (0x4331, VehicleStatus.C1),
+        (0x4332, VehicleStatus.C2),
+        (0x4431, VehicleStatus.D1),
+        (0x4432, VehicleStatus.D2),
+        (0x4530, VehicleStatus.E0),
+        (0x4630, VehicleStatus.F0),
+        (0x494E, VehicleStatus.IN),
     ])
     def test_all_iec_states(self, code, expected):
         assert _vehicle_status(code) == expected
 
     def test_null_falls_back_to_a1(self):
-        assert _vehicle_status(0x0000) == "A1"
+        assert _vehicle_status(0x0000) == VehicleStatus.A1
+
+    def test_string_equality_preserved(self):
+        assert _vehicle_status(0x4332) == "C2"
+
+    def test_unrecognised_code_returns_in_and_logs_warning(self, caplog):
+        with caplog.at_level(logging.WARNING, logger="aiophoenixcontactcharx.client"):
+            result = _vehicle_status(0x5858)  # "XX" — not a valid IEC code
+        assert result == VehicleStatus.IN
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "XX" in caplog.records[0].message
 
 
 # ---------------------------------------------------------------------------
