@@ -11,10 +11,11 @@ from enum import IntEnum, IntFlag, StrEnum
 # ---------------------------------------------------------------------------
 
 class ErrorCode(IntFlag):
-    """32-bit error bitmask from registers X293–X294 (Appendix B1).
+    """32-bit error bitmask from registers x293–x294 (Appendix B1).
 
     Bit positions are 0-indexed (manual is 1-indexed: bit_n = 1 << (n-1)).
-    Unused bits: 2 (bit 3), 7 (bit 8) through 15 (bit 16) are reserved.
+    Reserved (unused) bits: 2 (manual bit 3) and 7–15 (manual bits 8–16).
+    Bit 16 (manual bit 17) is the first used bit after the reserved range.
     """
     TEMPERATURE_TOO_HIGH          = 1 << 0
     TEMPERATURE_DERATING          = 1 << 1

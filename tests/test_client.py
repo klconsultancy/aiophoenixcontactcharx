@@ -500,6 +500,23 @@ class TestErrorCode:
         assert ErrorCode.OVERCURRENT_DETECTED in status.error_code
         assert ErrorCode.CP_ERROR not in status.error_code
 
+    async def test_high_bits_residual_current(self, mock_pymodbus):
+        from aiophoenixcontactcharx.models import ErrorCode
+        # Exercises bits 30 and 31 — the MSB pair that could be silently swapped
+        mask = (1 << 30) | (1 << 31)
+        regs = _cp_status_regs()
+        regs[61] = (mask >> 16) & 0xFFFF
+        regs[62] = mask & 0xFFFF
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        async with CharxClient("192.168.1.1") as client:
+            status, _ = await client.get_charging_point_status_and_control(1)
+
+        assert ErrorCode.RESIDUAL_CURRENT_TRIP in status.error_code
+        assert ErrorCode.RESIDUAL_CURRENT_SENSOR_ERROR in status.error_code
+        assert ErrorCode.CONTACTOR_ERROR not in status.error_code
+
 
 # ---------------------------------------------------------------------------
 # fetch_data
