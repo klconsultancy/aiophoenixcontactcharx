@@ -23,6 +23,7 @@ from .models import (
     ChargingPointStatus,
     DeviceInfo,
     EnergyMeterType,
+    ErrorCode,
     ModemRegistration,
     ModemSignalQuality,
     OvercurrentMonitoring,
@@ -388,7 +389,7 @@ class CharxClient:
             connection_time_s=_u32(regs, 53),
             charging_duration_s=_u32(regs, 55),
             session_energy_wh=_u64(regs, 57),
-            error_code=(_u32(regs, 61)),           # MSB=293 LSB=294 → one 32-bit word
+            error_code=ErrorCode(_u32(regs, 61)),
             digital_inputs=regs[63],
             setpoint_percent=regs[64],
             setpoint_a=regs[65],

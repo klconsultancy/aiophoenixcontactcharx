@@ -452,6 +452,56 @@ class TestGetChargingPointStatus:
 
 
 # ---------------------------------------------------------------------------
+# ErrorCode
+# ---------------------------------------------------------------------------
+
+class TestErrorCode:
+    async def test_no_errors(self, mock_pymodbus):
+        from aiophoenixcontactcharx.models import ErrorCode
+        regs = _cp_status_regs()
+        regs[61] = 0
+        regs[62] = 0
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        async with CharxClient("192.168.1.1") as client:
+            status, _ = await client.get_charging_point_status_and_control(1)
+
+        assert status.error_code == ErrorCode(0)
+        assert not status.error_code   # falsy when zero
+
+    async def test_single_bit_cp_error(self, mock_pymodbus):
+        from aiophoenixcontactcharx.models import ErrorCode
+        mask = 1 << 19  # CP_ERROR bit
+        regs = _cp_status_regs()
+        regs[61] = (mask >> 16) & 0xFFFF
+        regs[62] = mask & 0xFFFF
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        async with CharxClient("192.168.1.1") as client:
+            status, _ = await client.get_charging_point_status_and_control(1)
+
+        assert ErrorCode.CP_ERROR in status.error_code
+
+    async def test_multi_bit_error(self, mock_pymodbus):
+        from aiophoenixcontactcharx.models import ErrorCode
+        mask = (1 << 0) | (1 << 24)  # TEMPERATURE_TOO_HIGH | OVERCURRENT_DETECTED
+        regs = _cp_status_regs()
+        regs[61] = (mask >> 16) & 0xFFFF
+        regs[62] = mask & 0xFFFF
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        async with CharxClient("192.168.1.1") as client:
+            status, _ = await client.get_charging_point_status_and_control(1)
+
+        assert ErrorCode.TEMPERATURE_TOO_HIGH in status.error_code
+        assert ErrorCode.OVERCURRENT_DETECTED in status.error_code
+        assert ErrorCode.CP_ERROR not in status.error_code
+
+
+# ---------------------------------------------------------------------------
 # fetch_data
 # ---------------------------------------------------------------------------
 
