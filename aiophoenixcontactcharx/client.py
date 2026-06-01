@@ -115,6 +115,41 @@ def _overcurrent_monitoring(raw: int) -> OvercurrentMonitoring:
     return OvercurrentMonitoring.OFF
 
 
+def _modem_registration(raw: int) -> ModemRegistration:
+    if raw in ModemRegistration._value2member_map_:
+        return ModemRegistration(raw)
+    _LOGGER.warning("Unrecognised modem registration value %d; defaulting to UNKNOWN", raw)
+    return ModemRegistration.UNKNOWN
+
+
+def _modem_signal_quality(raw: int) -> ModemSignalQuality:
+    if raw in ModemSignalQuality._value2member_map_:
+        return ModemSignalQuality(raw)
+    _LOGGER.warning("Unrecognised modem signal quality value %d; defaulting to UNKNOWN", raw)
+    return ModemSignalQuality.UNKNOWN
+
+
+def _energy_meter_type(raw: int) -> EnergyMeterType:
+    if raw in EnergyMeterType._value2member_map_:
+        return EnergyMeterType(raw)
+    _LOGGER.warning("Unrecognised energy meter type value %d; defaulting to UNKNOWN", raw)
+    return EnergyMeterType.UNKNOWN
+
+
+def _temp_monitoring(raw: int) -> TempMonitoring:
+    if raw in TempMonitoring._value2member_map_:
+        return TempMonitoring(raw)
+    _LOGGER.warning("Unrecognised temp monitoring value %d; defaulting to INACTIVE", raw)
+    return TempMonitoring.INACTIVE
+
+
+def _release_mode(raw: int) -> ReleaseMode:
+    if raw in ReleaseMode._value2member_map_:
+        return ReleaseMode(raw)
+    _LOGGER.warning("Unrecognised release mode value %d; defaulting to DASHBOARD", raw)
+    return ReleaseMode.DASHBOARD
+
+
 def _ip(regs: list[int], offset: int) -> str:
     """Decode IPv4 address from 4 consecutive octet registers."""
     return ".".join(str(regs[offset + i]) for i in range(4))
@@ -282,12 +317,8 @@ class CharxClient:
             mac_eth1=_mac(regs, 18),
             ip_eth0=_ip(regs, 21),
             ip_eth1=_ip(regs, 25),
-            modem_registration=ModemRegistration(
-                regs[45] if regs[45] in ModemRegistration._value2member_map_ else 4
-            ),
-            modem_signal_quality=ModemSignalQuality(
-                regs[46] if regs[46] in ModemSignalQuality._value2member_map_ else 0
-            ),
+            modem_registration=_modem_registration(regs[45]),
+            modem_signal_quality=_modem_signal_quality(regs[46]),
             num_non_critical_error=regs[47],
             num_status_ef=regs[48],
             num_status_a=regs[49],
@@ -309,12 +340,6 @@ class CharxClient:
         """Read configuration registers for one charging point."""
         base = cp_register(charging_point, CP_CFG_OFFSET)
         regs = await self._read(base, CP_CFG_COUNT)
-        raw_meter = regs[12]
-        meter_type = (
-            EnergyMeterType(raw_meter)
-            if raw_meter in EnergyMeterType._value2member_map_
-            else EnergyMeterType.UNKNOWN
-        )
         return ChargingPointConfig(
             charging_point=charging_point,
             interface_config=regs[0],
@@ -325,19 +350,15 @@ class CharxClient:
             temp_upper_thr_c=regs[5],
             current_derating_start_a=regs[6],
             current_derating_stop_a=regs[7],
-            temp_monitoring=TempMonitoring(
-                regs[8] if regs[8] in TempMonitoring._value2member_map_ else 0
-            ),
+            temp_monitoring=_temp_monitoring(regs[8]),
             accept_status_d=bool(regs[9]),
             proximity_cfg=regs[10],
             overcurrent_monitoring=_overcurrent_monitoring(regs[11]),
-            energy_meter_type=meter_type,
+            energy_meter_type=_energy_meter_type(regs[12]),
             uid=_ascii(regs, 13, 3),
             server_uid=_ascii(regs, 16, 3),
             bus_position=regs[19],
-            release_mode=ReleaseMode(
-                regs[20] if regs[20] in ReleaseMode._value2member_map_ else 0
-            ),
+            release_mode=_release_mode(regs[20]),
         )
 
     async def get_charging_point_status_and_control(
