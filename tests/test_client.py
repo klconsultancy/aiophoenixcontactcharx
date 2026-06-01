@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
@@ -11,8 +12,6 @@ from aiophoenixcontactcharx import (
     CharxConnectionError,
     CharxModbusError,
 )
-import logging
-
 from aiophoenixcontactcharx.models import (
     EnergyMeterType,
     ModemRegistration,
@@ -310,7 +309,6 @@ class TestGetChargingPointConfig:
         mock_pymodbus.read_holding_registers = AsyncMock(
             return_value=_make_response(regs)
         )
-        import logging
         from aiophoenixcontactcharx.models import OvercurrentMonitoring
         with caplog.at_level(logging.WARNING, logger="aiophoenixcontactcharx.client"):
             async with CharxClient("192.168.1.1") as client:
@@ -320,6 +318,19 @@ class TestGetChargingPointConfig:
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert "99" in caplog.records[0].message
+
+    async def test_energy_meter_type_unknown_sentinel_decodes_silently(self, mock_pymodbus, caplog):
+        regs = _cp_cfg_regs()
+        regs[12] = 65535  # EnergyMeterType.UNKNOWN — legitimate device value, no warning
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        with caplog.at_level(logging.WARNING, logger="aiophoenixcontactcharx.client"):
+            async with CharxClient("192.168.1.1") as client:
+                config = await client.get_charging_point_config(1)
+
+        assert config.energy_meter_type == EnergyMeterType.UNKNOWN
+        assert len(caplog.records) == 0   # no warning for a recognised sentinel
 
     async def test_unrecognised_energy_meter_type_logs_warning(self, mock_pymodbus, caplog):
         regs = _cp_cfg_regs()

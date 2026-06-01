@@ -340,7 +340,6 @@ class CharxClient:
         """Read configuration registers for one charging point."""
         base = cp_register(charging_point, CP_CFG_OFFSET)
         regs = await self._read(base, CP_CFG_COUNT)
-        raw_meter = regs[12]
         return ChargingPointConfig(
             charging_point=charging_point,
             interface_config=regs[0],
