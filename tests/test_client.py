@@ -740,8 +740,13 @@ class TestControlWrites:
 
     async def test_set_locking_invalid_charging_point_raises(self, mock_pymodbus):
         async with CharxClient("192.168.1.1") as client:
-            with pytest.raises(ValueError):
+            with pytest.raises(ValueError, match="1.12"):
                 await client.set_locking(13, True)
+
+    async def test_set_locking_charging_point_zero_raises(self, mock_pymodbus):
+        async with CharxClient("192.168.1.1") as client:
+            with pytest.raises(ValueError, match="1.12"):
+                await client.set_locking(0, True)
 
     async def test_set_dynamic_max_current(self, mock_pymodbus):
         mock_pymodbus.write_register = AsyncMock(
