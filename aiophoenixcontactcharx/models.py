@@ -144,6 +144,10 @@ class DeviceInfo:
     mac_eth1: str = ""
     ip_eth0: str = ""
     ip_eth1: str = ""
+    subnet_eth0: str = ""
+    subnet_eth1: str = ""
+    gateway_eth0: str = ""
+    gateway_eth1: str = ""
     modem_registration: ModemRegistration = ModemRegistration.UNKNOWN
     modem_signal_quality: ModemSignalQuality = ModemSignalQuality.UNKNOWN
 

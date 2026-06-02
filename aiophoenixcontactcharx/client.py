@@ -156,6 +156,7 @@ def _release_mode(raw: int) -> ReleaseMode:
 _KNOWN_ERROR_CODE_BITS: int = 0
 for _m in ErrorCode:
     _KNOWN_ERROR_CODE_BITS |= int(_m)
+del _m
 
 
 def _error_code(raw: int) -> ErrorCode:
@@ -332,6 +333,10 @@ class CharxClient:
             mac_eth1=_mac(regs, 18),
             ip_eth0=_ip(regs, 21),
             ip_eth1=_ip(regs, 25),
+            subnet_eth0=_ip(regs, 29),
+            subnet_eth1=_ip(regs, 33),
+            gateway_eth0=_ip(regs, 37),
+            gateway_eth1=_ip(regs, 41),
             modem_registration=_modem_registration(regs[45]),
             modem_signal_quality=_modem_signal_quality(regs[46]),
             num_non_critical_error=regs[47],

@@ -47,6 +47,14 @@ def _global_regs() -> list[int]:
     regs[22] = 168
     regs[23] = 1
     regs[24] = 10
+    # subnet ETH0: 255.255.255.0
+    regs[29] = 255; regs[30] = 255; regs[31] = 255; regs[32] = 0
+    # subnet ETH1: 255.255.0.0
+    regs[33] = 255; regs[34] = 255; regs[35] = 0; regs[36] = 0
+    # gateway ETH0: 192.168.1.1 (non-zero to exercise the _ip() decoder; both gateways
+    # are documented as placeholder/always-0 on real devices per the manual)
+    regs[37] = 192; regs[38] = 168; regs[39] = 1; regs[40] = 1
+    # gateway ETH1: 0.0.0.0 (already zero-initialised; reflects real device behaviour)
     regs[45] = 1          # modem_registration = REGISTERED
     regs[46] = 4          # modem_signal_quality = GOOD
     regs[47] = 0          # num_non_critical_error
@@ -201,6 +209,18 @@ class TestGetDeviceInfo:
         assert info.group_current_l2_a is None   # unknown sentinel
         assert info.dynamic_max_current_a == 16
         assert info.availability is True
+
+    async def test_parses_subnet_and_gateway(self, mock_pymodbus):
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(_global_regs())
+        )
+        async with CharxClient("192.168.1.1") as client:
+            info = await client.get_device_info()
+
+        assert info.subnet_eth0 == "255.255.255.0"
+        assert info.subnet_eth1 == "255.255.0.0"
+        assert info.gateway_eth0 == "192.168.1.1"
+        assert info.gateway_eth1 == "0.0.0.0"
 
     async def test_unrecognised_modem_registration_logs_warning(self, mock_pymodbus, caplog):
         regs = _global_regs()
