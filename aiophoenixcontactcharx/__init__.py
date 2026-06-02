@@ -15,6 +15,7 @@ from .models import (
     ChargingPointData,
     ChargingPointStatus,
     DeviceInfo,
+    DigitalOutputMode,
     EnergyMeterType,
     ErrorCode,
     ModemRegistration,
@@ -23,6 +24,7 @@ from .models import (
     ReleaseMode,
     TempMonitoring,
     VehicleStatus,
+    pack_digital_outputs,
 )
 
 __version__ = "0.1.3"
@@ -40,11 +42,13 @@ __all__ = [
     "ChargingPointData",
     "ChargingPointStatus",
     "DeviceInfo",
+    "DigitalOutputMode",
     "EnergyMeterType",
     "ErrorCode",
     "ModemRegistration",
     "ModemSignalQuality",
     "OvercurrentMonitoring",
+    "pack_digital_outputs",
     "ReleaseMode",
     "TempMonitoring",
     "VehicleStatus",

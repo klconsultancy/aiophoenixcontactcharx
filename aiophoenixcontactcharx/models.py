@@ -45,6 +45,25 @@ class ErrorCode(IntFlag):
     RESIDUAL_CURRENT_TRIP         = 1 << 30
     RESIDUAL_CURRENT_SENSOR_ERROR = 1 << 31
 
+class DigitalOutputMode(IntEnum):
+    """4-bit output mode for one digital output channel (register X302, 4 bits per channel)."""
+    FLOATING  = 0
+    LOW       = 1
+    HIGH      = 2
+    FLASHING  = 3
+    PULSATILE = 4
+
+
+def pack_digital_outputs(
+    o1: DigitalOutputMode,
+    o2: DigitalOutputMode,
+    o3: DigitalOutputMode,
+    o4: DigitalOutputMode,
+) -> int:
+    """Pack four output modes into the 16-bit X302 register word (o1 in bits 3–0)."""
+    return (int(o4) << 12) | (int(o3) << 8) | (int(o2) << 4) | int(o1)
+
+
 class ReleaseMode(IntEnum):
     DASHBOARD = 0
     LOCAL_WHITELIST = 1
