@@ -328,7 +328,7 @@ class ChargingPointData:
 
     @property
     def is_connected(self) -> bool:
-        """True when a vehicle is physically connected (status B/C/D/E/F)."""
+        """True when a vehicle is physically connected (status B/C/D/E/F); A1, A2, and IN are excluded."""
         return self.status.vehicle_status not in (VehicleStatus.A1, VehicleStatus.A2, VehicleStatus.IN)
 
     @property

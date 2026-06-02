@@ -19,6 +19,7 @@ from aiophoenixcontactcharx.models import (
     ModemSignalQuality,
     ReleaseMode,
     TempMonitoring,
+    VehicleStatus,
 )
 
 
@@ -411,7 +412,7 @@ class TestGetChargingPointStatus:
         async with CharxClient("192.168.1.1") as client:
             status, control = await client.get_charging_point_status_and_control(1)
 
-        assert status.vehicle_status == "C2"
+        assert status.vehicle_status == VehicleStatus.C2
         assert status.voltage_l1_v == pytest.approx(230.0, rel=1e-3)
         assert status.current_l1_a == pytest.approx(16.0, rel=1e-3)
         assert status.current_l2_a is None   # sentinel
