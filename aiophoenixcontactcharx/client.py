@@ -156,6 +156,7 @@ def _release_mode(raw: int) -> ReleaseMode:
 _KNOWN_ERROR_CODE_BITS: int = 0
 for _m in ErrorCode:
     _KNOWN_ERROR_CODE_BITS |= int(_m)
+del _m
 
 
 def _error_code(raw: int) -> ErrorCode:

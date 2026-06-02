@@ -51,9 +51,10 @@ def _global_regs() -> list[int]:
     regs[29] = 255; regs[30] = 255; regs[31] = 255; regs[32] = 0
     # subnet ETH1: 255.255.0.0
     regs[33] = 255; regs[34] = 255; regs[35] = 0; regs[36] = 0
-    # gateway ETH0: 192.168.1.1
+    # gateway ETH0: 192.168.1.1 (non-zero to exercise the _ip() decoder; both gateways
+    # are documented as placeholder/always-0 on real devices per the manual)
     regs[37] = 192; regs[38] = 168; regs[39] = 1; regs[40] = 1
-    # gateway ETH1: 0.0.0.0 (manual says returns 0; already zero-initialised)
+    # gateway ETH1: 0.0.0.0 (already zero-initialised; reflects real device behaviour)
     regs[45] = 1          # modem_registration = REGISTERED
     regs[46] = 4          # modem_signal_quality = GOOD
     regs[47] = 0          # num_non_critical_error
