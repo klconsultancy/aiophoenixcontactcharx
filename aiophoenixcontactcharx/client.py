@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import logging
+from enum import IntEnum
 from types import TracebackType
-from typing import Any
+from typing import Any, TypeVar
 
 from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.exceptions import ModbusException
@@ -110,47 +111,18 @@ def _vehicle_status(reg: int) -> VehicleStatus:
     return VehicleStatus.A1
 
 
-def _overcurrent_monitoring(raw: int) -> OvercurrentMonitoring:
-    """Decode overcurrent monitoring mode; warn and fall back to OFF for unknown values."""
-    if raw in OvercurrentMonitoring._value2member_map_:
-        return OvercurrentMonitoring(raw)
-    _LOGGER.warning("Unrecognised overcurrent monitoring value %d; defaulting to OFF", raw)
-    return OvercurrentMonitoring.OFF
+_E = TypeVar("_E", bound=IntEnum)
 
 
-def _modem_registration(raw: int) -> ModemRegistration:
-    if raw in ModemRegistration._value2member_map_:
-        return ModemRegistration(raw)
-    _LOGGER.warning("Unrecognised modem registration value %d; defaulting to UNKNOWN", raw)
-    return ModemRegistration.UNKNOWN
-
-
-def _modem_signal_quality(raw: int) -> ModemSignalQuality:
-    if raw in ModemSignalQuality._value2member_map_:
-        return ModemSignalQuality(raw)
-    _LOGGER.warning("Unrecognised modem signal quality value %d; defaulting to UNKNOWN", raw)
-    return ModemSignalQuality.UNKNOWN
-
-
-def _energy_meter_type(raw: int) -> EnergyMeterType:
-    if raw in EnergyMeterType._value2member_map_:
-        return EnergyMeterType(raw)
-    _LOGGER.warning("Unrecognised energy meter type value %d; defaulting to UNKNOWN", raw)
-    return EnergyMeterType.UNKNOWN
-
-
-def _temp_monitoring(raw: int) -> TempMonitoring:
-    if raw in TempMonitoring._value2member_map_:
-        return TempMonitoring(raw)
-    _LOGGER.warning("Unrecognised temp monitoring value %d; defaulting to INACTIVE", raw)
-    return TempMonitoring.INACTIVE
-
-
-def _release_mode(raw: int) -> ReleaseMode:
-    if raw in ReleaseMode._value2member_map_:
-        return ReleaseMode(raw)
-    _LOGGER.warning("Unrecognised release mode value %d; defaulting to DASHBOARD", raw)
-    return ReleaseMode.DASHBOARD
+def _decode_enum(raw: int, enum_type: type[_E], fallback: _E) -> _E:
+    """Decode a raw Modbus register value to an IntEnum member, warning on unknown values."""
+    if raw in enum_type._value2member_map_:
+        return enum_type(raw)
+    _LOGGER.warning(
+        "Unrecognised %s value %d; defaulting to %s",
+        enum_type.__name__, raw, fallback.name,
+    )
+    return fallback
 
 
 _KNOWN_ERROR_CODE_BITS: int = 0
@@ -337,8 +309,8 @@ class CharxClient:
             subnet_eth1=_ip(regs, 33),
             gateway_eth0=_ip(regs, 37),
             gateway_eth1=_ip(regs, 41),
-            modem_registration=_modem_registration(regs[45]),
-            modem_signal_quality=_modem_signal_quality(regs[46]),
+            modem_registration=_decode_enum(regs[45], ModemRegistration, ModemRegistration.UNKNOWN),
+            modem_signal_quality=_decode_enum(regs[46], ModemSignalQuality, ModemSignalQuality.UNKNOWN),
             num_non_critical_error=regs[47],
             num_status_ef=regs[48],
             num_status_a=regs[49],
@@ -370,15 +342,15 @@ class CharxClient:
             temp_upper_thr_c=regs[5],
             current_derating_start_a=regs[6],
             current_derating_stop_a=regs[7],
-            temp_monitoring=_temp_monitoring(regs[8]),
+            temp_monitoring=_decode_enum(regs[8], TempMonitoring, TempMonitoring.INACTIVE),
             accept_status_d=bool(regs[9]),
             proximity_cfg=regs[10],
-            overcurrent_monitoring=_overcurrent_monitoring(regs[11]),
-            energy_meter_type=_energy_meter_type(regs[12]),
+            overcurrent_monitoring=_decode_enum(regs[11], OvercurrentMonitoring, OvercurrentMonitoring.OFF),
+            energy_meter_type=_decode_enum(regs[12], EnergyMeterType, EnergyMeterType.UNKNOWN),
             uid=_ascii(regs, 13, 3),
             server_uid=_ascii(regs, 16, 3),
             bus_position=regs[19],
-            release_mode=_release_mode(regs[20]),
+            release_mode=_decode_enum(regs[20], ReleaseMode, ReleaseMode.DASHBOARD),
         )
 
     async def get_charging_point_status_and_control(
