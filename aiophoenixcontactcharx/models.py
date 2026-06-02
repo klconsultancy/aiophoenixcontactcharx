@@ -61,7 +61,7 @@ def pack_digital_outputs(
     o4: DigitalOutputMode,
 ) -> int:
     """Pack four output modes into the 16-bit X302 register word (o1 in bits 3–0)."""
-    return (int(o4) << 12) | (int(o3) << 8) | (int(o2) << 4) | int(o1)
+    return ((int(o4) & 0xF) << 12) | ((int(o3) & 0xF) << 8) | ((int(o2) & 0xF) << 4) | (int(o1) & 0xF)
 
 
 class ReleaseMode(IntEnum):

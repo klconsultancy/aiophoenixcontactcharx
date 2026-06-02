@@ -485,6 +485,13 @@ class TestPackDigitalOutputs:
         assert DigitalOutputMode.HIGH == 2
         assert callable(pack_digital_outputs)
 
+    def test_nibble_overflow_clamped(self):
+        from aiophoenixcontactcharx.models import pack_digital_outputs
+        # Raw int 16 (0x10) would bleed into o2 nibble without the & 0xF mask
+        result = pack_digital_outputs(16, 0, 0, 0)  # type: ignore[arg-type]
+        assert result & 0x00F0 == 0, "nibble overflow must not bleed into o2"
+        assert result & 0x000F == 0, "o1 nibble should be 0 (16 & 0xF == 0)"
+
 
 # ---------------------------------------------------------------------------
 # ErrorCode
@@ -803,6 +810,11 @@ class TestControlWrites:
         async with CharxClient("192.168.1.1") as client:
             with pytest.raises(ValueError, match="1.12"):
                 await client.set_digital_outputs(0, 0)
+
+    async def test_set_digital_outputs_value_overflow_raises(self, mock_pymodbus):
+        async with CharxClient("192.168.1.1") as client:
+            with pytest.raises(ValueError, match="0xFFFF"):
+                await client.set_digital_outputs(1, 0x10000)
 
     async def test_set_dynamic_max_current(self, mock_pymodbus):
         mock_pymodbus.write_register = AsyncMock(
