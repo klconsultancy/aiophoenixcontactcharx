@@ -40,6 +40,8 @@ from .registers import (
     GLOBAL_COUNT,
     GROUP_AVAILABILITY,
     GROUP_DYNAMIC_MAX_CURRENT,
+    GROUP_RESET,
+    GROUP_SYSTEM_RESET,
     cp_register,
 )
 
@@ -499,6 +501,14 @@ class CharxClient:
         The group must be configured for Modbus release mode.
         """
         await self._write_register(GROUP_AVAILABILITY, int(bool(available)))
+
+    async def restart_server(self) -> None:
+        """Restart the SEC-3xxx server module only (register 165)."""
+        await self._write_register(GROUP_RESET, 1)
+
+    async def restart_all(self) -> None:
+        """Restart all controllers in the group (register 166)."""
+        await self._write_register(GROUP_SYSTEM_RESET, 1)
 
     async def set_dynamic_max_current(self, current_a: int) -> None:
         """Set the dynamic maximum current for the load management group."""
