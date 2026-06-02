@@ -40,6 +40,8 @@ from .registers import (
     GLOBAL_COUNT,
     GROUP_AVAILABILITY,
     GROUP_DYNAMIC_MAX_CURRENT,
+    GROUP_RESET,
+    GROUP_SYSTEM_RESET,
     cp_register,
 )
 
@@ -151,8 +153,13 @@ def _release_mode(raw: int) -> ReleaseMode:
     return ReleaseMode.DASHBOARD
 
 
+_KNOWN_ERROR_CODE_BITS: int = 0
+for _m in ErrorCode:
+    _KNOWN_ERROR_CODE_BITS |= int(_m)
+
+
 def _error_code(raw: int) -> ErrorCode:
-    unknown = raw & ~ErrorCode._flag_mask_
+    unknown = raw & ~_KNOWN_ERROR_CODE_BITS
     if unknown:
         _LOGGER.warning("ErrorCode: unrecognised bits 0x%08X in value 0x%08X; passing through", unknown, raw)
     return ErrorCode(raw)
@@ -500,6 +507,14 @@ class CharxClient:
         """
         await self._write_register(GROUP_AVAILABILITY, int(bool(available)))
 
+    async def restart_server(self) -> None:
+        """Restart the SEC-3xxx server module only (register 165)."""
+        await self._write_register(GROUP_RESET, 1)
+
+    async def restart_all(self) -> None:
+        """Restart all controllers in the group (register 166)."""
+        await self._write_register(GROUP_SYSTEM_RESET, 1)
+
     async def set_dynamic_max_current(self, current_a: int) -> None:
         """Set the dynamic maximum current for the load management group."""
         await self._write_register(GROUP_DYNAMIC_MAX_CURRENT, current_a)
@@ -514,9 +529,10 @@ class CharxClient:
         """
         if timer_s != 65535 and not 6 <= fallback_current_a <= 80:
             raise ValueError(f"Watchdog fallback current must be 6–80 A, got {fallback_current_a}")
-        await self._write_register(
-            cp_register(charging_point, 306), fallback_current_a
-        )
+        if timer_s != 65535:
+            await self._write_register(
+                cp_register(charging_point, 306), fallback_current_a
+            )
         await self._write_register(
             cp_register(charging_point, 307), timer_s
         )
