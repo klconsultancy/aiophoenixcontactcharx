@@ -716,6 +716,33 @@ class TestControlWrites:
             address=2304, value=0, device_id=1
         )
 
+    async def test_set_locking_locked(self, mock_pymodbus):
+        mock_pymodbus.write_register = AsyncMock(
+            return_value=MagicMock(isError=lambda: False)
+        )
+        async with CharxClient("192.168.1.1") as client:
+            await client.set_locking(1, True)
+
+        mock_pymodbus.write_register.assert_awaited_once_with(
+            address=1303, value=1, device_id=1
+        )
+
+    async def test_set_locking_unlocked(self, mock_pymodbus):
+        mock_pymodbus.write_register = AsyncMock(
+            return_value=MagicMock(isError=lambda: False)
+        )
+        async with CharxClient("192.168.1.1") as client:
+            await client.set_locking(2, False)
+
+        mock_pymodbus.write_register.assert_awaited_once_with(
+            address=2303, value=0, device_id=1
+        )
+
+    async def test_set_locking_invalid_charging_point_raises(self, mock_pymodbus):
+        async with CharxClient("192.168.1.1") as client:
+            with pytest.raises(ValueError):
+                await client.set_locking(13, True)
+
     async def test_set_dynamic_max_current(self, mock_pymodbus):
         mock_pymodbus.write_register = AsyncMock(
             return_value=MagicMock(isError=lambda: False)

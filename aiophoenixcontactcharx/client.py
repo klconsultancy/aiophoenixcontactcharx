@@ -474,6 +474,16 @@ class CharxClient:
             cp_register(charging_point, 304), int(available)
         )
 
+    async def set_locking(self, charging_point: int, locked: bool) -> None:
+        """Lock or unlock the charging connector (standard path, register X303).
+
+        The charging point must be configured for external locking mode.
+        For the emergency unlock path see force_unlock().
+        """
+        await self._write_register(
+            cp_register(charging_point, 303), int(locked)
+        )
+
     async def set_dynamic_max_current(self, current_a: int) -> None:
         """Set the dynamic maximum current for the load management group."""
         await self._write_register(GROUP_DYNAMIC_MAX_CURRENT, current_a)
