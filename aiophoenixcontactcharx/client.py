@@ -484,6 +484,15 @@ class CharxClient:
             cp_register(charging_point, 303), int(bool(locked))
         )
 
+    async def set_digital_outputs(self, charging_point: int, value: int) -> None:
+        """Write the packed digital output register (X302).
+
+        Use pack_digital_outputs() to build value from DigitalOutputMode members.
+        """
+        if not 0 <= value <= 0xFFFF:
+            raise ValueError(f"value must be 0–0xFFFF, got {value:#06x}")
+        await self._write_register(cp_register(charging_point, 302), value)
+
     async def set_dynamic_max_current(self, current_a: int) -> None:
         """Set the dynamic maximum current for the load management group."""
         await self._write_register(GROUP_DYNAMIC_MAX_CURRENT, current_a)

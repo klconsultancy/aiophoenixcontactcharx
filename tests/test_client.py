@@ -452,6 +452,48 @@ class TestGetChargingPointStatus:
 
 
 # ---------------------------------------------------------------------------
+# pack_digital_outputs
+# ---------------------------------------------------------------------------
+
+class TestPackDigitalOutputs:
+    def test_all_floating(self):
+        from aiophoenixcontactcharx.models import DigitalOutputMode, pack_digital_outputs
+        assert pack_digital_outputs(
+            DigitalOutputMode.FLOATING, DigitalOutputMode.FLOATING,
+            DigitalOutputMode.FLOATING, DigitalOutputMode.FLOATING,
+        ) == 0x0000
+
+    def test_known_combination(self):
+        from aiophoenixcontactcharx.models import DigitalOutputMode, pack_digital_outputs
+        # HIGH=2 in o1 (bits 3-0), LOW=1 in o2 (bits 7-4), FLOATING=0 in o3, HIGH=2 in o4 (bits 15-12)
+        result = pack_digital_outputs(
+            DigitalOutputMode.HIGH, DigitalOutputMode.LOW,
+            DigitalOutputMode.FLOATING, DigitalOutputMode.HIGH,
+        )
+        assert result == (2 << 0) | (1 << 4) | (0 << 8) | (2 << 12)
+
+    def test_all_pulsatile(self):
+        from aiophoenixcontactcharx.models import DigitalOutputMode, pack_digital_outputs
+        result = pack_digital_outputs(
+            DigitalOutputMode.PULSATILE, DigitalOutputMode.PULSATILE,
+            DigitalOutputMode.PULSATILE, DigitalOutputMode.PULSATILE,
+        )
+        assert result == 0x4444
+
+    def test_importable_from_package(self):
+        from aiophoenixcontactcharx import DigitalOutputMode, pack_digital_outputs
+        assert DigitalOutputMode.HIGH == 2
+        assert callable(pack_digital_outputs)
+
+    def test_nibble_overflow_clamped(self):
+        from aiophoenixcontactcharx.models import pack_digital_outputs
+        # Raw int 16 (0x10) would bleed into o2 nibble without the & 0xF mask
+        result = pack_digital_outputs(16, 0, 0, 0)  # type: ignore[arg-type]
+        assert result & 0x00F0 == 0, "nibble overflow must not bleed into o2"
+        assert result & 0x000F == 0, "o1 nibble should be 0 (16 & 0xF == 0)"
+
+
+# ---------------------------------------------------------------------------
 # ErrorCode
 # ---------------------------------------------------------------------------
 
@@ -747,6 +789,32 @@ class TestControlWrites:
         async with CharxClient("192.168.1.1") as client:
             with pytest.raises(ValueError, match="1.12"):
                 await client.set_locking(0, True)
+
+    async def test_set_digital_outputs_writes_packed_value(self, mock_pymodbus):
+        from aiophoenixcontactcharx.models import DigitalOutputMode, pack_digital_outputs
+        mock_pymodbus.write_register = AsyncMock(
+            return_value=MagicMock(isError=lambda: False)
+        )
+        value = pack_digital_outputs(
+            DigitalOutputMode.HIGH, DigitalOutputMode.LOW,
+            DigitalOutputMode.FLOATING, DigitalOutputMode.HIGH,
+        )
+        async with CharxClient("192.168.1.1") as client:
+            await client.set_digital_outputs(1, value)
+
+        mock_pymodbus.write_register.assert_awaited_once_with(
+            address=1302, value=value, device_id=1
+        )
+
+    async def test_set_digital_outputs_invalid_charging_point_raises(self, mock_pymodbus):
+        async with CharxClient("192.168.1.1") as client:
+            with pytest.raises(ValueError, match="1.12"):
+                await client.set_digital_outputs(0, 0)
+
+    async def test_set_digital_outputs_value_overflow_raises(self, mock_pymodbus):
+        async with CharxClient("192.168.1.1") as client:
+            with pytest.raises(ValueError, match="0xFFFF"):
+                await client.set_digital_outputs(1, 0x10000)
 
     async def test_set_dynamic_max_current(self, mock_pymodbus):
         mock_pymodbus.write_register = AsyncMock(
