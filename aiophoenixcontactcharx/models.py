@@ -3,12 +3,47 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import IntEnum, StrEnum
+from enum import IntEnum, IntFlag, StrEnum
 
 
 # ---------------------------------------------------------------------------
 # Enumerations (values match the Modbus register encoding from the manual)
 # ---------------------------------------------------------------------------
+
+class ErrorCode(IntFlag):
+    """32-bit error bitmask from registers x293–x294 (Appendix B1).
+
+    Bit numbering: Python uses 0-based (bit N = 1 << N); the manual uses
+    1-based (manual bit M = Python bit M-1).
+
+    Reserved (unused) bits:
+      - Python bit 2  (manual bit 3)
+      - Python bits 7–15  (manual bits 8–16)
+
+    Unknown bits from future firmware are preserved and trigger a WARNING log.
+    """
+    TEMPERATURE_TOO_HIGH          = 1 << 0
+    TEMPERATURE_DERATING          = 1 << 1
+    CONFIGURATION_ERROR           = 1 << 3
+    LOAD_MANAGEMENT_PAUSED        = 1 << 4
+    EVENT_ACTIONS_UNCLEAR         = 1 << 5
+    RFID_READER_ERROR             = 1 << 6
+    CONNECTOR_13A_20A_REJECTED    = 1 << 16
+    CONNECTOR_13A_REJECTED        = 1 << 17
+    PP_ERROR                      = 1 << 18
+    CP_ERROR                      = 1 << 19
+    VEHICLE_ERROR_F               = 1 << 20
+    LOCKING_ERROR                 = 1 << 21
+    LOCK_RELEASE_ERROR            = 1 << 22
+    UNKNOWN_LOCKING_STATE         = 1 << 23
+    OVERCURRENT_DETECTED          = 1 << 24
+    ENERGY_METER_COMM_ERROR       = 1 << 25
+    INVALID_STATUS_D              = 1 << 26
+    CONTACTOR_ERROR               = 1 << 27
+    EV_DIODE_ERROR                = 1 << 28
+    POWER_SUPPLY_ERROR            = 1 << 29
+    RESIDUAL_CURRENT_TRIP         = 1 << 30
+    RESIDUAL_CURRENT_SENSOR_ERROR = 1 << 31
 
 class ReleaseMode(IntEnum):
     DASHBOARD = 0
@@ -191,7 +226,7 @@ class ChargingPointStatus:
     charging_duration_s: int = 0
 
     # Fault & state
-    error_code: int = 0                 # 32-bit hex bitmask
+    error_code: ErrorCode = ErrorCode(0)
     digital_inputs: int = 0
     setpoint_percent: int = 0
     setpoint_a: int = 0

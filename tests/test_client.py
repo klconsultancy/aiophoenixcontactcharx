@@ -452,6 +452,92 @@ class TestGetChargingPointStatus:
 
 
 # ---------------------------------------------------------------------------
+# ErrorCode
+# ---------------------------------------------------------------------------
+
+class TestErrorCode:
+    async def test_no_errors(self, mock_pymodbus):
+        from aiophoenixcontactcharx.models import ErrorCode
+        regs = _cp_status_regs()
+        regs[61] = 0
+        regs[62] = 0
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        async with CharxClient("192.168.1.1") as client:
+            status, _ = await client.get_charging_point_status_and_control(1)
+
+        assert status.error_code == ErrorCode(0)
+        assert not status.error_code   # falsy when zero
+
+    async def test_single_bit_cp_error(self, mock_pymodbus):
+        from aiophoenixcontactcharx.models import ErrorCode
+        mask = int(ErrorCode.CP_ERROR)
+        regs = _cp_status_regs()
+        regs[61] = (mask >> 16) & 0xFFFF
+        regs[62] = mask & 0xFFFF
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        async with CharxClient("192.168.1.1") as client:
+            status, _ = await client.get_charging_point_status_and_control(1)
+
+        assert ErrorCode.CP_ERROR in status.error_code
+
+    async def test_multi_bit_error(self, mock_pymodbus):
+        from aiophoenixcontactcharx.models import ErrorCode
+        mask = int(ErrorCode.TEMPERATURE_TOO_HIGH | ErrorCode.OVERCURRENT_DETECTED)
+        regs = _cp_status_regs()
+        regs[61] = (mask >> 16) & 0xFFFF
+        regs[62] = mask & 0xFFFF
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        async with CharxClient("192.168.1.1") as client:
+            status, _ = await client.get_charging_point_status_and_control(1)
+
+        assert ErrorCode.TEMPERATURE_TOO_HIGH in status.error_code
+        assert ErrorCode.OVERCURRENT_DETECTED in status.error_code
+        assert ErrorCode.CP_ERROR not in status.error_code
+
+    async def test_high_bits_residual_current(self, mock_pymodbus):
+        from aiophoenixcontactcharx.models import ErrorCode
+        # Exercises bits 30 and 31 — the MSB pair that could be silently swapped
+        mask = int(ErrorCode.RESIDUAL_CURRENT_TRIP | ErrorCode.RESIDUAL_CURRENT_SENSOR_ERROR)
+        regs = _cp_status_regs()
+        regs[61] = (mask >> 16) & 0xFFFF
+        regs[62] = mask & 0xFFFF
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        async with CharxClient("192.168.1.1") as client:
+            status, _ = await client.get_charging_point_status_and_control(1)
+
+        assert ErrorCode.RESIDUAL_CURRENT_TRIP in status.error_code
+        assert ErrorCode.RESIDUAL_CURRENT_SENSOR_ERROR in status.error_code
+        assert ErrorCode.CONTACTOR_ERROR not in status.error_code
+
+    async def test_reserved_bit_logs_warning(self, mock_pymodbus):
+        from aiophoenixcontactcharx.models import ErrorCode
+        # Bit 8 is in the reserved range (bits 7–15); named bits still decode correctly.
+        mask = int(ErrorCode.CP_ERROR) | (1 << 8)
+        regs = _cp_status_regs()
+        regs[61] = (mask >> 16) & 0xFFFF
+        regs[62] = mask & 0xFFFF
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        with patch("aiophoenixcontactcharx.client._LOGGER") as mock_logger:
+            async with CharxClient("192.168.1.1") as client:
+                status, _ = await client.get_charging_point_status_and_control(1)
+
+        mock_logger.warning.assert_called_once()
+        # First format arg is the unknown-bits mask; second is the raw value
+        assert mock_logger.warning.call_args.args[1] == (1 << 8)
+        assert ErrorCode.CP_ERROR in status.error_code
+
+
+# ---------------------------------------------------------------------------
 # fetch_data
 # ---------------------------------------------------------------------------
 
