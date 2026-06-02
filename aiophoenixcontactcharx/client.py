@@ -151,6 +151,13 @@ def _release_mode(raw: int) -> ReleaseMode:
     return ReleaseMode.DASHBOARD
 
 
+def _error_code(raw: int) -> ErrorCode:
+    unknown = raw & ~ErrorCode._flag_mask_
+    if unknown:
+        _LOGGER.warning("ErrorCode: unrecognised bits 0x%08X in value 0x%08X; passing through", unknown, raw)
+    return ErrorCode(raw)
+
+
 def _ip(regs: list[int], offset: int) -> str:
     """Decode IPv4 address from 4 consecutive octet registers."""
     return ".".join(str(regs[offset + i]) for i in range(4))
@@ -389,7 +396,7 @@ class CharxClient:
             connection_time_s=_u32(regs, 53),
             charging_duration_s=_u32(regs, 55),
             session_energy_wh=_u64(regs, 57),
-            error_code=ErrorCode(_u32(regs, 61)),
+            error_code=_error_code(_u32(regs, 61)),
             digital_inputs=regs[63],
             setpoint_percent=regs[64],
             setpoint_a=regs[65],

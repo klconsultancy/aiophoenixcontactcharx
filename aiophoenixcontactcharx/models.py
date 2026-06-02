@@ -13,9 +13,14 @@ from enum import IntEnum, IntFlag, StrEnum
 class ErrorCode(IntFlag):
     """32-bit error bitmask from registers x293–x294 (Appendix B1).
 
-    Bit positions are 0-indexed (manual is 1-indexed: bit_n = 1 << (n-1)).
-    Reserved (unused) bits: 2 (manual bit 3) and 7–15 (manual bits 8–16).
-    Bit 16 (manual bit 17) is the first used bit after the reserved range.
+    Bit numbering: Python uses 0-based (bit N = 1 << N); the manual uses
+    1-based (manual bit M = Python bit M-1).
+
+    Reserved (unused) bits:
+      - Python bit 2  (manual bit 3)
+      - Python bits 7–15  (manual bits 8–16)
+
+    Unknown bits from future firmware are preserved and trigger a WARNING log.
     """
     TEMPERATURE_TOO_HIGH          = 1 << 0
     TEMPERATURE_DERATING          = 1 << 1
