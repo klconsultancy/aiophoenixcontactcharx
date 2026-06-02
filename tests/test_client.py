@@ -12,6 +12,7 @@ from aiophoenixcontactcharx import (
     CharxConnectionError,
     CharxModbusError,
 )
+from aiophoenixcontactcharx.registers import GROUP_AVAILABILITY
 from aiophoenixcontactcharx.models import (
     EnergyMeterType,
     ModemRegistration,
@@ -824,7 +825,7 @@ class TestControlWrites:
             await client.set_group_availability(False)
 
         mock_pymodbus.write_register.assert_awaited_once_with(
-            address=164, value=0, device_id=1
+            address=GROUP_AVAILABILITY, value=0, device_id=1
         )
 
     async def test_set_group_availability_true(self, mock_pymodbus):
@@ -835,7 +836,7 @@ class TestControlWrites:
             await client.set_group_availability(True)
 
         mock_pymodbus.write_register.assert_awaited_once_with(
-            address=164, value=1, device_id=1
+            address=GROUP_AVAILABILITY, value=1, device_id=1
         )
 
     async def test_set_dynamic_max_current(self, mock_pymodbus):

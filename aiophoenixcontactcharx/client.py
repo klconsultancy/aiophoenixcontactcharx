@@ -494,7 +494,10 @@ class CharxClient:
         await self._write_register(cp_register(charging_point, 302), value)
 
     async def set_group_availability(self, available: bool) -> None:
-        """Set availability for all Charging Points in the group simultaneously."""
+        """Set availability for all Charging Points in the group simultaneously.
+
+        The group must be configured for Modbus release mode.
+        """
         await self._write_register(GROUP_AVAILABILITY, int(bool(available)))
 
     async def set_dynamic_max_current(self, current_a: int) -> None:
