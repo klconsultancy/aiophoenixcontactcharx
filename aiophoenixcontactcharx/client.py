@@ -115,6 +115,7 @@ _E = TypeVar("_E", bound=IntEnum)
 
 
 def _decode_enum(raw: int, enum_type: type[_E], fallback: _E) -> _E:
+    """Decode a raw Modbus register value to an IntEnum member, warning on unknown values."""
     if raw in enum_type._value2member_map_:
         return enum_type(raw)
     _LOGGER.warning(

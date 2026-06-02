@@ -263,6 +263,17 @@ class TestGetDeviceInfo:
         assert info.gateway_eth0 == "192.168.1.1"
         assert info.gateway_eth1 == "0.0.0.0"
 
+    async def test_unrecognised_modem_registration_falls_back(self, mock_pymodbus):
+        regs = _global_regs()
+        regs[45] = 99  # not a valid ModemRegistration value
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        async with CharxClient("192.168.1.1") as client:
+            info = await client.get_device_info()
+
+        assert info.modem_registration == ModemRegistration.UNKNOWN
+
     async def test_modbus_error_raises(self, mock_pymodbus):
         err_resp = MagicMock()
         err_resp.isError.return_value = True
@@ -348,6 +359,16 @@ class TestGetChargingPointConfig:
         assert config.energy_meter_type == EnergyMeterType.UNKNOWN
         assert len(caplog.records) == 0   # no warning for a recognised sentinel
 
+    async def test_unrecognised_temp_monitoring_falls_back(self, mock_pymodbus):
+        regs = _cp_cfg_regs()
+        regs[8] = 99  # not a valid TempMonitoring value
+        mock_pymodbus.read_holding_registers = AsyncMock(
+            return_value=_make_response(regs)
+        )
+        async with CharxClient("192.168.1.1") as client:
+            config = await client.get_charging_point_config(1)
+
+        assert config.temp_monitoring == TempMonitoring.INACTIVE
 
 
 # ---------------------------------------------------------------------------
