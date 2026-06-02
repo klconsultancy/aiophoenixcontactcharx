@@ -329,22 +329,22 @@ class ChargingPointData:
     @property
     def is_connected(self) -> bool:
         """True when a vehicle is physically connected (status B/C/D/E/F)."""
-        return self.status.vehicle_status not in ("A1", "A2", "IN")
+        return self.status.vehicle_status not in (VehicleStatus.A1, VehicleStatus.A2, VehicleStatus.IN)
 
     @property
     def is_charging(self) -> bool:
         """True when energy is actively being transferred (IEC 61851-1 status C2 or D2)."""
-        return self.status.vehicle_status in ("C2", "D2")
+        return self.status.vehicle_status in (VehicleStatus.C2, VehicleStatus.D2)
 
     @property
     def has_error(self) -> bool:
         """True when the charging point is in a fault state (IEC 61851-1 status E)."""
-        return self.status.vehicle_status == "E0"
+        return self.status.vehicle_status == VehicleStatus.E0
 
     @property
     def is_unavailable(self) -> bool:
         """True when the charging point has been taken out of service (IEC 61851-1 status F)."""
-        return self.status.vehicle_status == "F0"
+        return self.status.vehicle_status == VehicleStatus.F0
 
 
 @dataclass
