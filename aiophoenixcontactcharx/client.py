@@ -153,8 +153,13 @@ def _release_mode(raw: int) -> ReleaseMode:
     return ReleaseMode.DASHBOARD
 
 
+_KNOWN_ERROR_CODE_BITS: int = 0
+for _m in ErrorCode:
+    _KNOWN_ERROR_CODE_BITS |= int(_m)
+
+
 def _error_code(raw: int) -> ErrorCode:
-    unknown = raw & ~ErrorCode._flag_mask_
+    unknown = raw & ~_KNOWN_ERROR_CODE_BITS
     if unknown:
         _LOGGER.warning("ErrorCode: unrecognised bits 0x%08X in value 0x%08X; passing through", unknown, raw)
     return ErrorCode(raw)
@@ -524,9 +529,10 @@ class CharxClient:
         """
         if timer_s != 65535 and not 6 <= fallback_current_a <= 80:
             raise ValueError(f"Watchdog fallback current must be 6–80 A, got {fallback_current_a}")
-        await self._write_register(
-            cp_register(charging_point, 306), fallback_current_a
-        )
+        if timer_s != 65535:
+            await self._write_register(
+                cp_register(charging_point, 306), fallback_current_a
+            )
         await self._write_register(
             cp_register(charging_point, 307), timer_s
         )

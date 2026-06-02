@@ -895,8 +895,12 @@ class TestControlWrites:
             return_value=MagicMock(isError=lambda: False)
         )
         async with CharxClient("192.168.1.1") as client:
-            # timer_s=65535 disables the watchdog; fallback_current_a is irrelevant
+            # timer_s=65535 disables the watchdog; fallback_current_a is not written
             await client.set_watchdog(1, timer_s=65535, fallback_current_a=0)
+
+        mock_pymodbus.write_register.assert_awaited_once_with(
+            address=1307, value=65535, device_id=1
+        )
 
     async def test_write_modbus_error_raises(self, mock_pymodbus):
         err_resp = MagicMock()
