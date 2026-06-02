@@ -451,7 +451,7 @@ class CharxClient:
         The charging point must be configured for Modbus release mode.
         """
         await self._write_register(
-            cp_register(charging_point, 300), int(enabled)
+            cp_register(charging_point, 300), int(bool(enabled))
         )
 
     async def set_max_current(self, charging_point: int, current_a: int) -> None:
@@ -471,7 +471,17 @@ class CharxClient:
         The charging point must be configured for Modbus release mode.
         """
         await self._write_register(
-            cp_register(charging_point, 304), int(available)
+            cp_register(charging_point, 304), int(bool(available))
+        )
+
+    async def set_locking(self, charging_point: int, locked: bool) -> None:
+        """Lock or unlock the charging connector (standard path, register X303).
+
+        The charging point must be configured for external locking mode.
+        For the emergency unlock path see force_unlock().
+        """
+        await self._write_register(
+            cp_register(charging_point, 303), int(bool(locked))
         )
 
     async def set_dynamic_max_current(self, current_a: int) -> None:
