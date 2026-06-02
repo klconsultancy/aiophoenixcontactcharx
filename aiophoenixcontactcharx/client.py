@@ -493,6 +493,10 @@ class CharxClient:
             raise ValueError(f"value must be 0–0xFFFF, got {value:#06x}")
         await self._write_register(cp_register(charging_point, 302), value)
 
+    async def set_group_availability(self, available: bool) -> None:
+        """Set availability for all Charging Points in the group simultaneously."""
+        await self._write_register(GROUP_AVAILABILITY, int(bool(available)))
+
     async def set_dynamic_max_current(self, current_a: int) -> None:
         """Set the dynamic maximum current for the load management group."""
         await self._write_register(GROUP_DYNAMIC_MAX_CURRENT, current_a)

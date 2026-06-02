@@ -816,6 +816,28 @@ class TestControlWrites:
             with pytest.raises(ValueError, match="0xFFFF"):
                 await client.set_digital_outputs(1, 0x10000)
 
+    async def test_set_group_availability_false(self, mock_pymodbus):
+        mock_pymodbus.write_register = AsyncMock(
+            return_value=MagicMock(isError=lambda: False)
+        )
+        async with CharxClient("192.168.1.1") as client:
+            await client.set_group_availability(False)
+
+        mock_pymodbus.write_register.assert_awaited_once_with(
+            address=164, value=0, device_id=1
+        )
+
+    async def test_set_group_availability_true(self, mock_pymodbus):
+        mock_pymodbus.write_register = AsyncMock(
+            return_value=MagicMock(isError=lambda: False)
+        )
+        async with CharxClient("192.168.1.1") as client:
+            await client.set_group_availability(True)
+
+        mock_pymodbus.write_register.assert_awaited_once_with(
+            address=164, value=1, device_id=1
+        )
+
     async def test_set_dynamic_max_current(self, mock_pymodbus):
         mock_pymodbus.write_register = AsyncMock(
             return_value=MagicMock(isError=lambda: False)
