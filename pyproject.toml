@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aiophoenixcontactcharx"
-version = "0.1.3"
+version = "1.0.0"
 description = "Async Python library for Phoenix Contact CHARX SEC EV charging controllers via Modbus/TCP"
 readme = "README.md"
 license = { text = "MIT" }
