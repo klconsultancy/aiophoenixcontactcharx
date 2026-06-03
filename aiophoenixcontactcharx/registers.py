@@ -4,39 +4,70 @@ Source: UM EN CHARX SEC, Revision 08 — Appendix B3, p. 167–174.
 All addresses are 0-indexed Modbus PDU addresses (as used by pymodbus).
 """
 
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class RegisterDef:
+    """Metadata for a single Modbus register (or contiguous multi-word field)."""
+    address: int
+    width: int       # number of 16-bit registers
+    description: str = ""
+
+
+def offset_of(reg: RegisterDef, base: RegisterDef) -> int:
+    """Array offset of *reg* relative to *base* (reg.address − base.address)."""
+    return reg.address - base.address
+
+
 # ---------------------------------------------------------------------------
-# Global registers (address range 0–999)
+# Global registers (address range 100–167)
 # Applies to the entire group (server + all clients + backplane modules).
 # ---------------------------------------------------------------------------
 
-DEVICE_DESIGNATION = 100    # 10 words, ASCII (20 chars)
-SOFTWARE_VERSION = 110       # 4 words, ASCII (8 chars)
-NUM_CONTROLLERS = 114        # 1 word, integer
-MAC_ETH0 = 115               # 3 words, HEX (bytes 0–5)
-MAC_ETH1 = 118               # 3 words, HEX
-IP_ETH0 = 121                # 4 words, 4× octet integers
-IP_ETH1 = 125                # 4 words, 4× octet integers
-SUBNET_ETH0 = 129            # 4 words, 4× octet integers
-SUBNET_ETH1 = 133            # 4 words, 4× octet integers
-GATEWAY_ETH0 = 137           # 4 words, placeholder (returns 0)
-GATEWAY_ETH1 = 141           # 4 words, placeholder (returns 0)
-MODEM_REGISTRATION = 145     # 1 word
-MODEM_SIGNAL_QUALITY = 146   # 1 word
-NUM_NON_CRITICAL_ERROR = 147 # 1 word
-NUM_STATUS_EF = 148          # 1 word
-NUM_STATUS_A = 149           # 1 word
-NUM_STATUS_BCD = 150         # 1 word
-NUM_CHARGING = 151           # 1 word (active C2 sessions)
-GROUP_ACTIVE_POWER = 152     # 2 words, integer [mW]
-GROUP_REACTIVE_POWER = 154   # 2 words, signed integer [mVAR]
-GROUP_APPARENT_POWER = 156   # 2 words, integer [mVA]
-GROUP_CURRENT_L1 = 158       # 2 words, integer [mA]; −1 if phase unknown
-GROUP_CURRENT_L2 = 160       # 2 words, integer [mA]
-GROUP_CURRENT_L3 = 162       # 2 words, integer [mA]
-GROUP_AVAILABILITY = 164     # 1 word, R/(W if configured)
-GROUP_RESET = 165            # 1 word, W — restart server only
-GROUP_SYSTEM_RESET = 166     # 1 word, W — restart all controllers
-GROUP_DYNAMIC_MAX_CURRENT = 167  # 1 word, R/W [A] — load management
+DEVICE_DESIGNATION       = RegisterDef(100, 10, "ASCII designation (20 chars)")
+SOFTWARE_VERSION         = RegisterDef(110,  4, "ASCII software version (8 chars)")
+NUM_CONTROLLERS          = RegisterDef(114,  1, "Number of connected controllers")
+MAC_ETH0                 = RegisterDef(115,  3, "MAC address ETH0 (3 × HEX word)")
+MAC_ETH1                 = RegisterDef(118,  3, "MAC address ETH1")
+IP_ETH0                  = RegisterDef(121,  4, "IP address ETH0 (4 × octet)")
+IP_ETH1                  = RegisterDef(125,  4, "IP address ETH1")
+SUBNET_ETH0              = RegisterDef(129,  4, "Subnet mask ETH0")
+SUBNET_ETH1              = RegisterDef(133,  4, "Subnet mask ETH1")
+GATEWAY_ETH0             = RegisterDef(137,  4, "Default gateway ETH0 (placeholder, returns 0)")
+GATEWAY_ETH1             = RegisterDef(141,  4, "Default gateway ETH1 (placeholder, returns 0)")
+MODEM_REGISTRATION       = RegisterDef(145,  1, "Modem registration status")
+MODEM_SIGNAL_QUALITY     = RegisterDef(146,  1, "Modem signal quality")
+NUM_NON_CRITICAL_ERROR   = RegisterDef(147,  1, "Count of non-critical errors in group")
+NUM_STATUS_EF            = RegisterDef(148,  1, "Count of CPs in status E/F")
+NUM_STATUS_A             = RegisterDef(149,  1, "Count of CPs in status A")
+NUM_STATUS_BCD           = RegisterDef(150,  1, "Count of CPs in status B/C/D")
+NUM_CHARGING             = RegisterDef(151,  1, "Count of active C2 charging sessions")
+GROUP_ACTIVE_POWER       = RegisterDef(152,  2, "Group active power [mW]")
+GROUP_REACTIVE_POWER     = RegisterDef(154,  2, "Group reactive power [mVAR] (signed)")
+GROUP_APPARENT_POWER     = RegisterDef(156,  2, "Group apparent power [mVA]")
+GROUP_CURRENT_L1         = RegisterDef(158,  2, "Group current L1 [mA]; −1 if phase unknown")
+GROUP_CURRENT_L2         = RegisterDef(160,  2, "Group current L2 [mA]")
+GROUP_CURRENT_L3         = RegisterDef(162,  2, "Group current L3 [mA]")
+_GROUP_AVAILABILITY_REG  = RegisterDef(164,  1, "Group availability (R/W if configured)")
+_GROUP_RESET_REG         = RegisterDef(165,  1, "Restart server only (W)")
+_GROUP_SYSTEM_RESET_REG  = RegisterDef(166,  1, "Restart all controllers (W)")
+_GROUP_DYNAMIC_MAX_REG   = RegisterDef(167,  1, "Dynamic max current for load management (R/W) [A]")
+
+GLOBAL_REGISTERS: tuple[RegisterDef, ...] = (
+    DEVICE_DESIGNATION, SOFTWARE_VERSION, NUM_CONTROLLERS,
+    MAC_ETH0, MAC_ETH1,
+    IP_ETH0, IP_ETH1,
+    SUBNET_ETH0, SUBNET_ETH1,
+    GATEWAY_ETH0, GATEWAY_ETH1,
+    MODEM_REGISTRATION, MODEM_SIGNAL_QUALITY,
+    NUM_NON_CRITICAL_ERROR, NUM_STATUS_EF, NUM_STATUS_A, NUM_STATUS_BCD, NUM_CHARGING,
+    GROUP_ACTIVE_POWER, GROUP_REACTIVE_POWER, GROUP_APPARENT_POWER,
+    GROUP_CURRENT_L1, GROUP_CURRENT_L2, GROUP_CURRENT_L3,
+    _GROUP_AVAILABILITY_REG, _GROUP_RESET_REG, _GROUP_SYSTEM_RESET_REG, _GROUP_DYNAMIC_MAX_REG,
+)
 
 # ---------------------------------------------------------------------------
 # Per-charging-point register offsets
@@ -45,82 +76,112 @@ GROUP_DYNAMIC_MAX_CURRENT = 167  # 1 word, R/W [A] — load management
 # ---------------------------------------------------------------------------
 
 # Configuration (offsets 100–123 within the x000 block)
-CP_INTERFACE_CONFIG = 100    # 1 word; 0=socket, 1=connector
-CP_MAX_CURRENT_CFG = 101     # 1 word [A]
-CP_MIN_CURRENT_CFG = 102     # 1 word [A]
-CP_RCM_CONFIGURED = 103      # 1 word; 0=no, 1=yes
-CP_TEMP_LOWER_THR = 104      # 1 word [°C]
-CP_TEMP_UPPER_THR = 105      # 1 word [°C]
-CP_CURRENT_DERING_START = 106  # 1 word [A]
-CP_CURRENT_DERING_STOP = 107   # 1 word [A]
-CP_TEMP_MONITORING = 108     # 1 word; 0=off, 1=Pt1000, 2=PTC
-CP_ACCEPT_STATUS_D = 109     # 1 word; 0=blocked, 1=allow
-CP_PROXIMITY_CFG = 110       # 1 word; 0=IEC 61851-1
-CP_OVERCURRENT_MON = 111     # 1 word; 0=off, 1=120%/10s, 2=EV/ZE Ready
-CP_ENERGY_METER_TYPE = 112   # 1 word; see EnergyMeterType
-CP_UID = 113                 # 3 words, ASCII (6 chars)
-CP_SERVER_UID = 116          # 3 words, ASCII
-CP_BUS_POSITION = 119        # 1 word
-CP_RELEASE_MODE = 120        # 1 word; see ReleaseMode
-CP_RFID_UID = 121            # 3 words, ASCII (placeholder, returns 0)
+CP_INTERFACE_CONFIG      = RegisterDef(100, 1, "Interface config: 0=socket, 1=connector")
+CP_MAX_CURRENT_CFG       = RegisterDef(101, 1, "Max current [A]")
+CP_MIN_CURRENT_CFG       = RegisterDef(102, 1, "Min current [A]")
+CP_RCM_CONFIGURED        = RegisterDef(103, 1, "RCM configured: 0=no, 1=yes")
+CP_TEMP_LOWER_THR        = RegisterDef(104, 1, "Temperature lower threshold [°C]")
+CP_TEMP_UPPER_THR        = RegisterDef(105, 1, "Temperature upper threshold [°C]")
+CP_CURRENT_DERING_START  = RegisterDef(106, 1, "Current derating start [A]")
+CP_CURRENT_DERING_STOP   = RegisterDef(107, 1, "Current derating stop [A]")
+CP_TEMP_MONITORING       = RegisterDef(108, 1, "Temperature monitoring type")
+CP_ACCEPT_STATUS_D       = RegisterDef(109, 1, "Accept status D: 0=blocked, 1=allow")
+CP_PROXIMITY_CFG         = RegisterDef(110, 1, "Proximity pilot configuration")
+CP_OVERCURRENT_MON       = RegisterDef(111, 1, "Overcurrent monitoring mode")
+CP_ENERGY_METER_TYPE     = RegisterDef(112, 1, "Energy meter type")
+CP_UID                   = RegisterDef(113, 3, "CP UID, ASCII (6 chars)")
+CP_SERVER_UID            = RegisterDef(116, 3, "Server UID, ASCII")
+CP_BUS_POSITION          = RegisterDef(119, 1, "Bus position")
+CP_RELEASE_MODE          = RegisterDef(120, 1, "Release mode")
+CP_RFID_UID              = RegisterDef(121, 3, "RFID UID placeholder (returns 0)")
+
+CP_CFG_REGISTERS: tuple[RegisterDef, ...] = (
+    CP_INTERFACE_CONFIG, CP_MAX_CURRENT_CFG, CP_MIN_CURRENT_CFG,
+    CP_RCM_CONFIGURED, CP_TEMP_LOWER_THR, CP_TEMP_UPPER_THR,
+    CP_CURRENT_DERING_START, CP_CURRENT_DERING_STOP,
+    CP_TEMP_MONITORING, CP_ACCEPT_STATUS_D, CP_PROXIMITY_CFG,
+    CP_OVERCURRENT_MON, CP_ENERGY_METER_TYPE,
+    CP_UID, CP_SERVER_UID, CP_BUS_POSITION, CP_RELEASE_MODE, CP_RFID_UID,
+)
 
 # Status (offsets 232–299)
-CP_VOLTAGE_L1 = 232          # 2 words, uint32 [mV]
-CP_VOLTAGE_L2 = 234          # 2 words, uint32 [mV]
-CP_VOLTAGE_L3 = 236          # 2 words, uint32 [mV]
-CP_CURRENT_L1 = 238          # 2 words, int32 [mA]; −1 if phase unknown
-CP_CURRENT_L2 = 240          # 2 words, int32 [mA]
-CP_CURRENT_L3 = 242          # 2 words, int32 [mA]
-CP_ACTIVE_POWER = 244        # 2 words, uint32 [mW]
-CP_REACTIVE_POWER = 246      # 2 words, int32 [mVAR] (signed)
-CP_APPARENT_POWER = 248      # 2 words, uint32 [mVA]
-CP_ENERGY_ACTIVE = 250       # 4 words, uint64 [Wh]
-CP_ENERGY_REACTIVE = 254     # 4 words, int64 [VARh] (signed)
-CP_ENERGY_APPARENT = 258     # 4 words, uint64 [VAh]
-CP_SOC_KWH = 262             # 2 words, placeholder (returns 0)
-CP_SOC_PERCENT = 264         # 1 word, placeholder (returns 0)
-CP_EVCC_ID = 265             # 10 words, ASCII (20 chars)
-CP_LAST_RFID = 275           # 10 words, ASCII (20 chars)
-CP_CONNECTION_TIME = 285     # 2 words, uint32 [s] — time in status B/C/D
-CP_CHARGING_DURATION = 287   # 2 words, uint32 [s] — time in C/D, reset B→A
-CP_SESSION_ENERGY = 289      # 4 words, uint64 [Wh] — current session
-CP_ERROR_CODE = 293          # 2 words, hexadecimal (MSB=293, LSB=294)
-CP_DIGITAL_INPUTS = 295      # 1 word, binary (1 bit per input)
-CP_SETPOINT_PERCENT = 296    # 1 word [%]
-CP_SETPOINT_AMPERE = 297     # 1 word [A]
-CP_CABLE_CAPACITY = 298      # 1 word [A]
-CP_VEHICLE_STATUS = 299      # 1 word, 2-char ASCII; e.g. 'C2' = 0x4332
+CP_VOLTAGE_L1        = RegisterDef(232,  2, "Voltage L1 [mV]")
+CP_VOLTAGE_L2        = RegisterDef(234,  2, "Voltage L2 [mV]")
+CP_VOLTAGE_L3        = RegisterDef(236,  2, "Voltage L3 [mV]")
+CP_CURRENT_L1        = RegisterDef(238,  2, "Current L1 [mA]; −1 if phase unknown")
+CP_CURRENT_L2        = RegisterDef(240,  2, "Current L2 [mA]")
+CP_CURRENT_L3        = RegisterDef(242,  2, "Current L3 [mA]")
+CP_ACTIVE_POWER      = RegisterDef(244,  2, "Active power [mW]")
+CP_REACTIVE_POWER    = RegisterDef(246,  2, "Reactive power [mVAR] (signed)")
+CP_APPARENT_POWER    = RegisterDef(248,  2, "Apparent power [mVA]")
+CP_ENERGY_ACTIVE     = RegisterDef(250,  4, "Lifetime active energy [Wh]")
+CP_ENERGY_REACTIVE   = RegisterDef(254,  4, "Lifetime reactive energy [VARh] (signed)")
+CP_ENERGY_APPARENT   = RegisterDef(258,  4, "Lifetime apparent energy [VAh]")
+CP_SOC_KWH           = RegisterDef(262,  2, "SOC [kWh] — placeholder (returns 0)")
+CP_SOC_PERCENT       = RegisterDef(264,  1, "SOC [%] — placeholder (returns 0)")
+CP_EVCC_ID           = RegisterDef(265, 10, "EVCC ID, ASCII (20 chars)")
+CP_LAST_RFID         = RegisterDef(275, 10, "Last RFID tag UID, ASCII")
+CP_CONNECTION_TIME   = RegisterDef(285,  2, "Connection time [s] (status B/C/D)")
+CP_CHARGING_DURATION = RegisterDef(287,  2, "Charging duration [s] (status C/D)")
+CP_SESSION_ENERGY    = RegisterDef(289,  4, "Session energy [Wh]")
+CP_ERROR_CODE        = RegisterDef(293,  2, "Error bitmask (MSW=293, LSW=294)")
+CP_DIGITAL_INPUTS    = RegisterDef(295,  1, "Digital inputs (1 bit per input)")
+CP_SETPOINT_PERCENT  = RegisterDef(296,  1, "Current setpoint [%]")
+CP_SETPOINT_AMPERE   = RegisterDef(297,  1, "Current setpoint [A]")
+CP_CABLE_CAPACITY    = RegisterDef(298,  1, "Cable capacity [A]")
+CP_VEHICLE_STATUS    = RegisterDef(299,  1, "IEC 61851-1 vehicle status (2-char ASCII)")
 
 # Control (offsets 300–308)
-CP_CHARGING_RELEASE = 300    # 1 word, R/W (must be in Modbus release mode)
-CP_MAX_CURRENT = 301         # 1 word, R/W [A] range 6–80
-CP_DIGITAL_OUTPUTS = 302     # 1 word, R/W (4 bits per output)
-CP_LOCKING = 303             # 1 word, R/W (must be configured for external)
-CP_STATUS_F = 304            # 1 word, R/W (must be in Modbus release mode)
-CP_FORCE_UNLOCK = 305        # 1 word, R/W; write 1 to unlock
-CP_WATCHDOG_CURRENT = 306    # 1 word, R/W [A] — current on watchdog expiry
-CP_WATCHDOG_TIMER = 307      # 1 word, R/W [s]; 65535 = disabled
-CP_RESET_RFID = 308          # 1 word, R/W; write >0 to clear last RFID tag
+CP_CHARGING_RELEASE  = RegisterDef(300,  1, "Charging release (R/W)")
+CP_MAX_CURRENT       = RegisterDef(301,  1, "Max current (R/W) [A] range 6–80")
+CP_DIGITAL_OUTPUTS   = RegisterDef(302,  1, "Digital outputs (R/W, 4 bits per channel)")
+CP_LOCKING           = RegisterDef(303,  1, "Connector lock (R/W)")
+CP_STATUS_F          = RegisterDef(304,  1, "Status F / availability (R/W)")
+CP_FORCE_UNLOCK      = RegisterDef(305,  1, "Force unlock — write 1 (W)")
+CP_WATCHDOG_CURRENT  = RegisterDef(306,  1, "Watchdog fallback current (R/W) [A]")
+CP_WATCHDOG_TIMER    = RegisterDef(307,  1, "Watchdog timer (R/W) [s]; 65535 = disabled")
+CP_RESET_RFID        = RegisterDef(308,  1, "Clear last RFID tag — write > 0 (W)")
 
-# Derived read windows ---------------------------------------------------------
-# Global: read registers 100–167 → 68 registers
-GLOBAL_BASE = 100
-GLOBAL_COUNT = 68
+CP_STATUS_REGISTERS: tuple[RegisterDef, ...] = (
+    CP_VOLTAGE_L1, CP_VOLTAGE_L2, CP_VOLTAGE_L3,
+    CP_CURRENT_L1, CP_CURRENT_L2, CP_CURRENT_L3,
+    CP_ACTIVE_POWER, CP_REACTIVE_POWER, CP_APPARENT_POWER,
+    CP_ENERGY_ACTIVE, CP_ENERGY_REACTIVE, CP_ENERGY_APPARENT,
+    CP_SOC_KWH, CP_SOC_PERCENT,
+    CP_EVCC_ID, CP_LAST_RFID,
+    CP_CONNECTION_TIME, CP_CHARGING_DURATION, CP_SESSION_ENERGY,
+    CP_ERROR_CODE, CP_DIGITAL_INPUTS,
+    CP_SETPOINT_PERCENT, CP_SETPOINT_AMPERE, CP_CABLE_CAPACITY, CP_VEHICLE_STATUS,
+    CP_CHARGING_RELEASE, CP_MAX_CURRENT, CP_DIGITAL_OUTPUTS,
+    CP_LOCKING, CP_STATUS_F, CP_FORCE_UNLOCK,
+    CP_WATCHDOG_CURRENT, CP_WATCHDOG_TIMER, CP_RESET_RFID,
+)
 
-# Per-CP config: read x*1000+100 → 24 registers (offsets 100–123)
-CP_CFG_OFFSET = 100
-CP_CFG_COUNT = 24
+# ---------------------------------------------------------------------------
+# Derived read-window constants
+# ---------------------------------------------------------------------------
 
-# Per-CP status+control: read x*1000+232 → 77 registers (offsets 232–308)
-CP_STATUS_OFFSET = 232
-CP_STATUS_COUNT = 77  # 308 − 232 + 1
+GLOBAL_BASE  = DEVICE_DESIGNATION.address               # 100
+GLOBAL_COUNT = sum(r.width for r in GLOBAL_REGISTERS)   # 68
+
+CP_CFG_OFFSET = CP_INTERFACE_CONFIG.address              # 100
+CP_CFG_COUNT  = sum(r.width for r in CP_CFG_REGISTERS)  # 24
+
+CP_STATUS_OFFSET = CP_VOLTAGE_L1.address                          # 232
+CP_STATUS_COUNT  = sum(r.width for r in CP_STATUS_REGISTERS)     # 77
+
+# Integer addresses for group-level write operations (imported by client.py)
+GROUP_AVAILABILITY        = _GROUP_AVAILABILITY_REG.address   # 164
+GROUP_RESET               = _GROUP_RESET_REG.address          # 165
+GROUP_SYSTEM_RESET        = _GROUP_SYSTEM_RESET_REG.address   # 166
+GROUP_DYNAMIC_MAX_CURRENT = _GROUP_DYNAMIC_MAX_REG.address    # 167
 
 
 def cp_register(charging_point: int, offset: int) -> int:
     """Absolute Modbus address for a per-charging-point register.
 
     charging_point: 1-indexed controller number (matches x in xNNN notation).
-    offset: the per-CP register offset (e.g. CP_VEHICLE_STATUS = 299).
+    offset: the per-CP register offset (e.g. CP_VEHICLE_STATUS.address = 299).
     """
     if not 1 <= charging_point <= 12:
         raise ValueError(f"charging_point must be 1–12, got {charging_point}")
