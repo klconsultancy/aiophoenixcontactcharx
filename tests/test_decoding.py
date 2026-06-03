@@ -307,6 +307,9 @@ class TestDecodeDeviceInfo:
     def test_group_current_l2_unknown(self):
         assert _decode_device_info(global_regs()).group_current_l2_a is None
 
+    def test_group_current_l3_unknown(self):
+        assert _decode_device_info(global_regs()).group_current_l3_a is None
+
     def test_availability_and_dynamic_current(self):
         info = _decode_device_info(global_regs())
         assert info.availability is True
@@ -367,14 +370,23 @@ class TestDecodeCpStatusAndControl:
         status, _ = _decode_cp_status_and_control(1, cp_status_regs())
         assert status.error_code == ErrorCode(0)
 
-    def test_error_code_bits(self):
+    def test_error_code_upper_word_bits(self):
         regs = cp_status_regs()
-        mask = ErrorCode.CP_ERROR | ErrorCode.PP_ERROR
+        mask = ErrorCode.CP_ERROR | ErrorCode.PP_ERROR  # bits 18–19, upper word
         regs[61] = (int(mask) >> 16) & 0xFFFF
         regs[62] = int(mask) & 0xFFFF
         status, _ = _decode_cp_status_and_control(1, regs)
         assert ErrorCode.CP_ERROR in status.error_code
         assert ErrorCode.PP_ERROR in status.error_code
+
+    def test_error_code_lower_word_bits(self):
+        regs = cp_status_regs()
+        mask = ErrorCode.TEMPERATURE_TOO_HIGH | ErrorCode.RFID_READER_ERROR  # bits 0 and 6, lower word
+        regs[61] = (int(mask) >> 16) & 0xFFFF
+        regs[62] = int(mask) & 0xFFFF
+        status, _ = _decode_cp_status_and_control(1, regs)
+        assert ErrorCode.TEMPERATURE_TOO_HIGH in status.error_code
+        assert ErrorCode.RFID_READER_ERROR in status.error_code
 
     def test_control_fields(self):
         _, control = _decode_cp_status_and_control(1, cp_status_regs())

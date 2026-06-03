@@ -49,6 +49,9 @@ def global_regs() -> list[int]:
     # group_current_l2: unknown (-1)
     regs[60] = 0xFFFF
     regs[61] = 0xFFFF
+    # group_current_l3: unknown (-1)
+    regs[62] = 0xFFFF
+    regs[63] = 0xFFFF
     regs[64] = 1          # availability = True
     regs[67] = 16         # dynamic_max_current = 16 A
     return regs
