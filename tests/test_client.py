@@ -13,10 +13,12 @@ from aiophoenixcontactcharx import (
     CharxModbusError,
 )
 from aiophoenixcontactcharx.registers import GROUP_AVAILABILITY, GROUP_RESET, GROUP_SYSTEM_RESET
+from aiophoenixcontactcharx.client import _decode_enum
 from aiophoenixcontactcharx.models import (
     EnergyMeterType,
     ModemRegistration,
     ModemSignalQuality,
+    OvercurrentMonitoring,
     ReleaseMode,
     TempMonitoring,
     VehicleStatus,
@@ -136,6 +138,45 @@ def _make_response(registers: list[int]) -> MagicMock:
 
 
 # ---------------------------------------------------------------------------
+# _decode_enum
+# ---------------------------------------------------------------------------
+
+class TestDecodeEnum:
+    @pytest.mark.parametrize("enum_type,fallback", [
+        (ModemRegistration,    ModemRegistration.UNKNOWN),
+        (ModemSignalQuality,   ModemSignalQuality.UNKNOWN),
+        (OvercurrentMonitoring, OvercurrentMonitoring.OFF),
+        (EnergyMeterType,      EnergyMeterType.UNKNOWN),
+        (TempMonitoring,       TempMonitoring.INACTIVE),
+        (ReleaseMode,          ReleaseMode.DASHBOARD),
+    ])
+    def test_unknown_value_returns_fallback_and_logs_warning(self, enum_type, fallback, caplog):
+        with caplog.at_level(logging.WARNING, logger="aiophoenixcontactcharx.client"):
+            result = _decode_enum(99, enum_type, fallback)
+
+        assert result is fallback
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert enum_type.__name__ in caplog.records[0].message
+        assert "99" in caplog.records[0].message
+
+    @pytest.mark.parametrize("enum_type,valid_value", [
+        (ModemRegistration,    ModemRegistration.REGISTERED),
+        (ModemSignalQuality,   ModemSignalQuality.GOOD),
+        (OvercurrentMonitoring, OvercurrentMonitoring.PCT120_10S),
+        (EnergyMeterType,      EnergyMeterType.EEM_EM357),
+        (TempMonitoring,       TempMonitoring.PT1000),
+        (ReleaseMode,          ReleaseMode.MODBUS),
+    ])
+    def test_known_value_returns_member_without_warning(self, enum_type, valid_value, caplog):
+        with caplog.at_level(logging.WARNING, logger="aiophoenixcontactcharx.client"):
+            result = _decode_enum(int(valid_value), enum_type, valid_value)
+
+        assert result is valid_value
+        assert len(caplog.records) == 0
+
+
+# ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
@@ -223,35 +264,16 @@ class TestGetDeviceInfo:
         assert info.gateway_eth0 == "192.168.1.1"
         assert info.gateway_eth1 == "0.0.0.0"
 
-    async def test_unrecognised_modem_registration_logs_warning(self, mock_pymodbus, caplog):
+    async def test_unrecognised_modem_registration_falls_back(self, mock_pymodbus):
         regs = _global_regs()
         regs[45] = 99  # not a valid ModemRegistration value
         mock_pymodbus.read_holding_registers = AsyncMock(
             return_value=_make_response(regs)
         )
-        with caplog.at_level(logging.WARNING, logger="aiophoenixcontactcharx.client"):
-            async with CharxClient("192.168.1.1") as client:
-                info = await client.get_device_info()
+        async with CharxClient("192.168.1.1") as client:
+            info = await client.get_device_info()
 
         assert info.modem_registration == ModemRegistration.UNKNOWN
-        assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
-        assert "99" in caplog.records[0].message
-
-    async def test_unrecognised_modem_signal_quality_logs_warning(self, mock_pymodbus, caplog):
-        regs = _global_regs()
-        regs[46] = 99  # not a valid ModemSignalQuality value
-        mock_pymodbus.read_holding_registers = AsyncMock(
-            return_value=_make_response(regs)
-        )
-        with caplog.at_level(logging.WARNING, logger="aiophoenixcontactcharx.client"):
-            async with CharxClient("192.168.1.1") as client:
-                info = await client.get_device_info()
-
-        assert info.modem_signal_quality == ModemSignalQuality.UNKNOWN
-        assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
-        assert "99" in caplog.records[0].message
 
     async def test_modbus_error_raises(self, mock_pymodbus):
         err_resp = MagicMock()
@@ -325,22 +347,6 @@ class TestGetChargingPointConfig:
 
         assert config.overcurrent_monitoring == OvercurrentMonitoring.EV_ZE_READY
 
-    async def test_unrecognised_overcurrent_falls_back_to_off(self, mock_pymodbus, caplog):
-        regs = _cp_cfg_regs()
-        regs[11] = 99  # unknown value
-        mock_pymodbus.read_holding_registers = AsyncMock(
-            return_value=_make_response(regs)
-        )
-        from aiophoenixcontactcharx.models import OvercurrentMonitoring
-        with caplog.at_level(logging.WARNING, logger="aiophoenixcontactcharx.client"):
-            async with CharxClient("192.168.1.1") as client:
-                config = await client.get_charging_point_config(1)
-
-        assert config.overcurrent_monitoring == OvercurrentMonitoring.OFF
-        assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
-        assert "99" in caplog.records[0].message
-
     async def test_energy_meter_type_unknown_sentinel_decodes_silently(self, mock_pymodbus, caplog):
         regs = _cp_cfg_regs()
         regs[12] = 65535  # EnergyMeterType.UNKNOWN — legitimate device value, no warning
@@ -354,50 +360,16 @@ class TestGetChargingPointConfig:
         assert config.energy_meter_type == EnergyMeterType.UNKNOWN
         assert len(caplog.records) == 0   # no warning for a recognised sentinel
 
-    async def test_unrecognised_energy_meter_type_logs_warning(self, mock_pymodbus, caplog):
-        regs = _cp_cfg_regs()
-        regs[12] = 99  # not a valid EnergyMeterType value
-        mock_pymodbus.read_holding_registers = AsyncMock(
-            return_value=_make_response(regs)
-        )
-        with caplog.at_level(logging.WARNING, logger="aiophoenixcontactcharx.client"):
-            async with CharxClient("192.168.1.1") as client:
-                config = await client.get_charging_point_config(1)
-
-        assert config.energy_meter_type == EnergyMeterType.UNKNOWN
-        assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
-        assert "99" in caplog.records[0].message
-
-    async def test_unrecognised_temp_monitoring_logs_warning(self, mock_pymodbus, caplog):
+    async def test_unrecognised_temp_monitoring_falls_back(self, mock_pymodbus):
         regs = _cp_cfg_regs()
         regs[8] = 99  # not a valid TempMonitoring value
         mock_pymodbus.read_holding_registers = AsyncMock(
             return_value=_make_response(regs)
         )
-        with caplog.at_level(logging.WARNING, logger="aiophoenixcontactcharx.client"):
-            async with CharxClient("192.168.1.1") as client:
-                config = await client.get_charging_point_config(1)
+        async with CharxClient("192.168.1.1") as client:
+            config = await client.get_charging_point_config(1)
 
         assert config.temp_monitoring == TempMonitoring.INACTIVE
-        assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
-        assert "99" in caplog.records[0].message
-
-    async def test_unrecognised_release_mode_logs_warning(self, mock_pymodbus, caplog):
-        regs = _cp_cfg_regs()
-        regs[20] = 99  # not a valid ReleaseMode value
-        mock_pymodbus.read_holding_registers = AsyncMock(
-            return_value=_make_response(regs)
-        )
-        with caplog.at_level(logging.WARNING, logger="aiophoenixcontactcharx.client"):
-            async with CharxClient("192.168.1.1") as client:
-                config = await client.get_charging_point_config(1)
-
-        assert config.release_mode == ReleaseMode.DASHBOARD
-        assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == "WARNING"
-        assert "99" in caplog.records[0].message
 
 
 # ---------------------------------------------------------------------------
