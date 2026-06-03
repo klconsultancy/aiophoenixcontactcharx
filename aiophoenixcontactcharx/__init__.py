@@ -1,6 +1,7 @@
 """aiophoenixcontactcharx — async Python library for Phoenix Contact CHARX SEC EV charging controllers."""
 
 from .client import CharxClient
+from .registers import RegisterDef, cp_register, offset_of
 from .exceptions import (
     CharxConnectionError,
     CharxError,
@@ -31,6 +32,9 @@ __version__ = "0.1.3"
 
 __all__ = [
     "CharxClient",
+    "RegisterDef",
+    "cp_register",
+    "offset_of",
     "CharxData",
     "CharxError",
     "CharxConnectionError",

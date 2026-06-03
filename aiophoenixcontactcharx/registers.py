@@ -19,7 +19,12 @@ class RegisterDef:
 
 def offset_of(reg: RegisterDef, base: RegisterDef) -> int:
     """Array offset of *reg* relative to *base* (reg.address − base.address)."""
-    return reg.address - base.address
+    result = reg.address - base.address
+    if result < 0:
+        raise ValueError(
+            f"{reg!r} (address {reg.address}) precedes base {base!r} (address {base.address})"
+        )
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -177,12 +182,13 @@ GROUP_SYSTEM_RESET        = _GROUP_SYSTEM_RESET_REG.address   # 166
 GROUP_DYNAMIC_MAX_CURRENT = _GROUP_DYNAMIC_MAX_REG.address    # 167
 
 
-def cp_register(charging_point: int, offset: int) -> int:
+def cp_register(charging_point: int, offset: int | RegisterDef) -> int:
     """Absolute Modbus address for a per-charging-point register.
 
     charging_point: 1-indexed controller number (matches x in xNNN notation).
-    offset: the per-CP register offset (e.g. CP_VEHICLE_STATUS.address = 299).
+    offset: register offset as a plain int or a RegisterDef (its .address is used).
     """
     if not 1 <= charging_point <= 12:
         raise ValueError(f"charging_point must be 1–12, got {charging_point}")
-    return charging_point * 1000 + offset
+    addr = offset.address if isinstance(offset, RegisterDef) else offset
+    return charging_point * 1000 + addr

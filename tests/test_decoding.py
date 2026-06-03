@@ -275,6 +275,12 @@ class TestCpRegister:
         with pytest.raises(ValueError, match="1–12"):
             cp_register(49, 299)
 
+    def test_accepts_register_def(self):
+        assert cp_register(1, CP_VEHICLE_STATUS) == 1299
+
+    def test_register_def_matches_int_offset(self):
+        assert cp_register(5, CP_VEHICLE_STATUS) == cp_register(5, CP_VEHICLE_STATUS.address)
+
 
 # ---------------------------------------------------------------------------
 # RegisterDef + offset_of
@@ -307,6 +313,10 @@ class TestRegisterDef:
 
     def test_offset_of_modem_registration(self):
         assert offset_of(MODEM_REGISTRATION, DEVICE_DESIGNATION) == 45
+
+    def test_offset_of_raises_when_reg_precedes_base(self):
+        with pytest.raises(ValueError):
+            offset_of(CP_VOLTAGE_L1, CP_VEHICLE_STATUS)
 
     def test_register_def_width_is_positive(self):
         from aiophoenixcontactcharx.registers import GLOBAL_REGISTERS, CP_CFG_REGISTERS, CP_STATUS_REGISTERS
