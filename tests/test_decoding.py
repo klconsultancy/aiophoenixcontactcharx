@@ -6,7 +6,20 @@ These functions are pure (no I/O) so they run without any Modbus connection.
 import logging
 import pytest
 from aiophoenixcontactcharx.models import ErrorCode, ModemRegistration, ModemSignalQuality, ReleaseMode, VehicleStatus
-from aiophoenixcontactcharx.registers import cp_register
+from aiophoenixcontactcharx.registers import (
+    CP_CHARGING_RELEASE,
+    CP_ERROR_CODE,
+    CP_EVCC_ID,
+    CP_VEHICLE_STATUS,
+    CP_VOLTAGE_L1,
+    CP_CFG_COUNT,
+    CP_STATUS_COUNT,
+    DEVICE_DESIGNATION,
+    GLOBAL_COUNT,
+    MODEM_REGISTRATION,
+    cp_register,
+    offset_of,
+)
 from aiophoenixcontactcharx.client import (
     _ascii,
     _decode_cp_config,
@@ -261,6 +274,75 @@ class TestCpRegister:
     def test_cp49_raises(self):
         with pytest.raises(ValueError, match="1–12"):
             cp_register(49, 299)
+
+    def test_accepts_register_def(self):
+        assert cp_register(1, CP_VEHICLE_STATUS) == 1299
+
+    def test_register_def_matches_int_offset(self):
+        assert cp_register(5, CP_VEHICLE_STATUS) == cp_register(5, CP_VEHICLE_STATUS.address)
+
+
+# ---------------------------------------------------------------------------
+# RegisterDef + offset_of
+# ---------------------------------------------------------------------------
+
+class TestRegisterDef:
+    def test_global_count_derived(self):
+        assert GLOBAL_COUNT == 68
+
+    def test_cp_cfg_count_derived(self):
+        assert CP_CFG_COUNT == 24
+
+    def test_cp_status_count_derived(self):
+        assert CP_STATUS_COUNT == 77
+
+    def test_offset_of_vehicle_status(self):
+        assert offset_of(CP_VEHICLE_STATUS, CP_VOLTAGE_L1) == 67
+
+    def test_offset_of_evcc_id_documents_soc_skip(self):
+        # Offsets 30–32 (registers 262–264: CP_SOC_KWH + CP_SOC_PERCENT) are
+        # placeholder registers skipped by the decoder.
+        assert offset_of(CP_EVCC_ID, CP_VOLTAGE_L1) == 33
+
+    def test_offset_of_control_boundary(self):
+        # Control registers start at offset 68 relative to CP_VOLTAGE_L1 (232).
+        assert offset_of(CP_CHARGING_RELEASE, CP_VOLTAGE_L1) == 68
+
+    def test_offset_of_error_code(self):
+        assert offset_of(CP_ERROR_CODE, CP_VOLTAGE_L1) == 61
+
+    def test_offset_of_modem_registration(self):
+        assert offset_of(MODEM_REGISTRATION, DEVICE_DESIGNATION) == 45
+
+    def test_offset_of_raises_when_reg_precedes_base(self):
+        with pytest.raises(ValueError):
+            offset_of(CP_VOLTAGE_L1, CP_VEHICLE_STATUS)
+
+    def test_register_def_width_is_positive(self):
+        from aiophoenixcontactcharx.registers import GLOBAL_REGISTERS, CP_CFG_REGISTERS, CP_STATUS_REGISTERS
+        for reg in (*GLOBAL_REGISTERS, *CP_CFG_REGISTERS, *CP_STATUS_REGISTERS):
+            assert reg.width >= 1, f"{reg} has non-positive width"
+
+    def test_register_def_contiguous_global(self):
+        from aiophoenixcontactcharx.registers import GLOBAL_REGISTERS
+        addr = GLOBAL_REGISTERS[0].address
+        for reg in GLOBAL_REGISTERS:
+            assert reg.address == addr, f"Gap before {reg}"
+            addr += reg.width
+
+    def test_register_def_contiguous_cp_cfg(self):
+        from aiophoenixcontactcharx.registers import CP_CFG_REGISTERS
+        addr = CP_CFG_REGISTERS[0].address
+        for reg in CP_CFG_REGISTERS:
+            assert reg.address == addr, f"Gap before {reg}"
+            addr += reg.width
+
+    def test_register_def_contiguous_cp_status(self):
+        from aiophoenixcontactcharx.registers import CP_STATUS_REGISTERS
+        addr = CP_STATUS_REGISTERS[0].address
+        for reg in CP_STATUS_REGISTERS:
+            assert reg.address == addr, f"Gap before {reg}"
+            addr += reg.width
 
 
 # ---------------------------------------------------------------------------

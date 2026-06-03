@@ -35,8 +35,17 @@ from .models import (
 from .registers import (
     CP_CFG_COUNT,
     CP_CFG_OFFSET,
+    CP_CHARGING_RELEASE,
+    CP_DIGITAL_OUTPUTS,
+    CP_FORCE_UNLOCK,
+    CP_LOCKING,
+    CP_MAX_CURRENT,
+    CP_RESET_RFID,
     CP_STATUS_COUNT,
+    CP_STATUS_F,
     CP_STATUS_OFFSET,
+    CP_WATCHDOG_CURRENT,
+    CP_WATCHDOG_TIMER,
     GLOBAL_BASE,
     GLOBAL_COUNT,
     GROUP_AVAILABILITY,
@@ -451,7 +460,7 @@ class CharxClient:
         The charging point must be configured for Modbus release mode.
         """
         await self._write_register(
-            cp_register(charging_point, 300), int(bool(enabled))
+            cp_register(charging_point, CP_CHARGING_RELEASE), int(bool(enabled))
         )
 
     async def set_max_current(self, charging_point: int, current_a: int) -> None:
@@ -461,7 +470,7 @@ class CharxClient:
         """
         if not 6 <= current_a <= 80:
             raise ValueError(f"Max current must be 6–80 A, got {current_a}")
-        await self._write_register(cp_register(charging_point, 301), current_a)
+        await self._write_register(cp_register(charging_point, CP_MAX_CURRENT), current_a)
 
     async def set_availability(
         self, charging_point: int, available: bool
@@ -471,7 +480,7 @@ class CharxClient:
         The charging point must be configured for Modbus release mode.
         """
         await self._write_register(
-            cp_register(charging_point, 304), int(bool(available))
+            cp_register(charging_point, CP_STATUS_F), int(bool(available))
         )
 
     async def set_locking(self, charging_point: int, locked: bool) -> None:
@@ -481,7 +490,7 @@ class CharxClient:
         For the emergency unlock path see force_unlock().
         """
         await self._write_register(
-            cp_register(charging_point, 303), int(bool(locked))
+            cp_register(charging_point, CP_LOCKING), int(bool(locked))
         )
 
     async def set_digital_outputs(self, charging_point: int, value: int) -> None:
@@ -491,7 +500,7 @@ class CharxClient:
         """
         if not 0 <= value <= 0xFFFF:
             raise ValueError(f"value must be 0–0xFFFF, got {value:#06x}")
-        await self._write_register(cp_register(charging_point, 302), value)
+        await self._write_register(cp_register(charging_point, CP_DIGITAL_OUTPUTS), value)
 
     async def set_group_availability(self, available: bool) -> None:
         """Set availability for all Charging Points in the group simultaneously.
@@ -524,16 +533,16 @@ class CharxClient:
             raise ValueError(f"Watchdog fallback current must be 6–80 A, got {fallback_current_a}")
         if timer_s != 65535:
             await self._write_register(
-                cp_register(charging_point, 306), fallback_current_a
+                cp_register(charging_point, CP_WATCHDOG_CURRENT), fallback_current_a
             )
         await self._write_register(
-            cp_register(charging_point, 307), timer_s
+            cp_register(charging_point, CP_WATCHDOG_TIMER), timer_s
         )
 
     async def force_unlock(self, charging_point: int) -> None:
         """Force-unlock the charging connector."""
-        await self._write_register(cp_register(charging_point, 305), 1)
+        await self._write_register(cp_register(charging_point, CP_FORCE_UNLOCK), 1)
 
     async def reset_last_rfid(self, charging_point: int) -> None:
         """Clear the last RFID UID stored in register x275."""
-        await self._write_register(cp_register(charging_point, 308), 1)
+        await self._write_register(cp_register(charging_point, CP_RESET_RFID), 1)

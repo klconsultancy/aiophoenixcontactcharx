@@ -12,7 +12,7 @@ from aiophoenixcontactcharx import (
     CharxConnectionError,
     CharxModbusError,
 )
-from aiophoenixcontactcharx.registers import GROUP_AVAILABILITY, GROUP_RESET, GROUP_SYSTEM_RESET
+from aiophoenixcontactcharx.registers import GROUP_AVAILABILITY, GROUP_DYNAMIC_MAX_CURRENT, GROUP_RESET, GROUP_SYSTEM_RESET
 from aiophoenixcontactcharx.client import _decode_enum
 from aiophoenixcontactcharx.models import (
     EnergyMeterType,
@@ -762,7 +762,7 @@ class TestControlWrites:
             await client.set_dynamic_max_current(32)
 
         mock_pymodbus.write_register.assert_awaited_once_with(
-            address=167, value=32, device_id=1
+            address=GROUP_DYNAMIC_MAX_CURRENT, value=32, device_id=1
         )
 
     async def test_set_watchdog_below_minimum_raises(self, mock_pymodbus):
