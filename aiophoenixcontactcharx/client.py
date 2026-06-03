@@ -159,6 +159,110 @@ def _maybe_phase_current(regs: list[int], offset: int) -> int | None:
 
 
 # ---------------------------------------------------------------------------
+# Pure decoder functions (no I/O; accept raw register arrays)
+# ---------------------------------------------------------------------------
+
+def _decode_device_info(regs: list[int]) -> DeviceInfo:
+    """Decode global registers 100–167 into a DeviceInfo (offset 0 = register 100)."""
+    return DeviceInfo(
+        designation=_ascii(regs, 0, 10),
+        software_version=_ascii(regs, 10, 4),
+        num_controllers=regs[14],
+        mac_eth0=_mac(regs, 15),
+        mac_eth1=_mac(regs, 18),
+        ip_eth0=_ip(regs, 21),
+        ip_eth1=_ip(regs, 25),
+        subnet_eth0=_ip(regs, 29),
+        subnet_eth1=_ip(regs, 33),
+        gateway_eth0=_ip(regs, 37),
+        gateway_eth1=_ip(regs, 41),
+        modem_registration=_decode_enum(regs[45], ModemRegistration, ModemRegistration.UNKNOWN),
+        modem_signal_quality=_decode_enum(regs[46], ModemSignalQuality, ModemSignalQuality.UNKNOWN),
+        num_non_critical_error=regs[47],
+        num_status_ef=regs[48],
+        num_status_a=regs[49],
+        num_status_bcd=regs[50],
+        num_charging=regs[51],
+        group_active_power_mw=_u32(regs, 52),
+        group_reactive_power_mvar=_s32(regs, 54),
+        group_apparent_power_mva=_u32(regs, 56),
+        group_current_l1_ma=_maybe_phase_current(regs, 58),
+        group_current_l2_ma=_maybe_phase_current(regs, 60),
+        group_current_l3_ma=_maybe_phase_current(regs, 62),
+        availability=bool(regs[64]),
+        dynamic_max_current_a=regs[67],
+    )
+
+
+def _decode_cp_config(charging_point: int, regs: list[int]) -> ChargingPointConfig:
+    """Decode charging-point config registers (offset 0 = register x100) into ChargingPointConfig."""
+    return ChargingPointConfig(
+        charging_point=charging_point,
+        interface_config=regs[0],
+        max_current_cfg_a=regs[1],
+        min_current_cfg_a=regs[2],
+        rcm_configured=bool(regs[3]),
+        temp_lower_thr_c=regs[4],
+        temp_upper_thr_c=regs[5],
+        current_derating_start_a=regs[6],
+        current_derating_stop_a=regs[7],
+        temp_monitoring=_decode_enum(regs[8], TempMonitoring, TempMonitoring.INACTIVE),
+        accept_status_d=bool(regs[9]),
+        proximity_cfg=regs[10],
+        overcurrent_monitoring=_decode_enum(regs[11], OvercurrentMonitoring, OvercurrentMonitoring.OFF),
+        energy_meter_type=_decode_enum(regs[12], EnergyMeterType, EnergyMeterType.UNKNOWN),
+        uid=_ascii(regs, 13, 3),
+        server_uid=_ascii(regs, 16, 3),
+        bus_position=regs[19],
+        release_mode=_decode_enum(regs[20], ReleaseMode, ReleaseMode.DASHBOARD),
+    )
+
+
+def _decode_cp_status_and_control(
+    charging_point: int, regs: list[int]
+) -> tuple[ChargingPointStatus, ChargingPointControl]:
+    """Decode status+control registers (offset 0 = register x232) into (status, control)."""
+    status = ChargingPointStatus(
+        charging_point=charging_point,
+        voltage_l1_mv=_u32(regs, 0),
+        voltage_l2_mv=_u32(regs, 2),
+        voltage_l3_mv=_u32(regs, 4),
+        current_l1_ma=_maybe_phase_current(regs, 6),
+        current_l2_ma=_maybe_phase_current(regs, 8),
+        current_l3_ma=_maybe_phase_current(regs, 10),
+        active_power_mw=_u32(regs, 12),
+        reactive_power_mvar=_s32(regs, 14),
+        apparent_power_mva=_u32(regs, 16),
+        energy_active_wh=_u64(regs, 18),
+        energy_reactive_varh=_s64(regs, 22),
+        energy_apparent_vah=_u64(regs, 26),
+        last_evcc_id=_ascii(regs, 33, 10),
+        last_rfid=_ascii(regs, 43, 10),
+        connection_time_s=_u32(regs, 53),
+        charging_duration_s=_u32(regs, 55),
+        session_energy_wh=_u64(regs, 57),
+        error_code=_error_code(_u32(regs, 61)),
+        digital_inputs=regs[63],
+        setpoint_percent=regs[64],
+        setpoint_a=regs[65],
+        cable_capacity_a=regs[66],
+        vehicle_status=_vehicle_status(regs[67]),
+    )
+    control = ChargingPointControl(
+        charging_point=charging_point,
+        charging_release=bool(regs[68]),
+        max_current_a=regs[69],
+        digital_outputs=regs[70],
+        locking=bool(regs[71]),
+        available=bool(regs[72]),
+        force_unlock_pending=bool(regs[73]),
+        watchdog_current_a=regs[74],
+        watchdog_timer_s=regs[75],
+    )
+    return status, control
+
+
+# ---------------------------------------------------------------------------
 # CharxClient
 # ---------------------------------------------------------------------------
 
@@ -295,111 +399,23 @@ class CharxClient:
 
     async def get_device_info(self) -> DeviceInfo:
         """Read global registers 100–167 and return a DeviceInfo snapshot."""
-        regs = await self._read(GLOBAL_BASE, GLOBAL_COUNT)
-        # offset = register_address - GLOBAL_BASE
-        return DeviceInfo(
-            designation=_ascii(regs, 0, 10),
-            software_version=_ascii(regs, 10, 4),
-            num_controllers=regs[14],
-            mac_eth0=_mac(regs, 15),
-            mac_eth1=_mac(regs, 18),
-            ip_eth0=_ip(regs, 21),
-            ip_eth1=_ip(regs, 25),
-            subnet_eth0=_ip(regs, 29),
-            subnet_eth1=_ip(regs, 33),
-            gateway_eth0=_ip(regs, 37),
-            gateway_eth1=_ip(regs, 41),
-            modem_registration=_decode_enum(regs[45], ModemRegistration, ModemRegistration.UNKNOWN),
-            modem_signal_quality=_decode_enum(regs[46], ModemSignalQuality, ModemSignalQuality.UNKNOWN),
-            num_non_critical_error=regs[47],
-            num_status_ef=regs[48],
-            num_status_a=regs[49],
-            num_status_bcd=regs[50],
-            num_charging=regs[51],
-            group_active_power_mw=_u32(regs, 52),
-            group_reactive_power_mvar=_s32(regs, 54),
-            group_apparent_power_mva=_u32(regs, 56),
-            group_current_l1_ma=_maybe_phase_current(regs, 58),
-            group_current_l2_ma=_maybe_phase_current(regs, 60),
-            group_current_l3_ma=_maybe_phase_current(regs, 62),
-            availability=bool(regs[64]),
-            dynamic_max_current_a=regs[67],
-        )
+        return _decode_device_info(await self._read(GLOBAL_BASE, GLOBAL_COUNT))
 
     async def get_charging_point_config(
         self, charging_point: int
     ) -> ChargingPointConfig:
         """Read configuration registers for one charging point."""
-        base = cp_register(charging_point, CP_CFG_OFFSET)
-        regs = await self._read(base, CP_CFG_COUNT)
-        return ChargingPointConfig(
-            charging_point=charging_point,
-            interface_config=regs[0],
-            max_current_cfg_a=regs[1],
-            min_current_cfg_a=regs[2],
-            rcm_configured=bool(regs[3]),
-            temp_lower_thr_c=regs[4],
-            temp_upper_thr_c=regs[5],
-            current_derating_start_a=regs[6],
-            current_derating_stop_a=regs[7],
-            temp_monitoring=_decode_enum(regs[8], TempMonitoring, TempMonitoring.INACTIVE),
-            accept_status_d=bool(regs[9]),
-            proximity_cfg=regs[10],
-            overcurrent_monitoring=_decode_enum(regs[11], OvercurrentMonitoring, OvercurrentMonitoring.OFF),
-            energy_meter_type=_decode_enum(regs[12], EnergyMeterType, EnergyMeterType.UNKNOWN),
-            uid=_ascii(regs, 13, 3),
-            server_uid=_ascii(regs, 16, 3),
-            bus_position=regs[19],
-            release_mode=_decode_enum(regs[20], ReleaseMode, ReleaseMode.DASHBOARD),
+        return _decode_cp_config(
+            charging_point, await self._read(cp_register(charging_point, CP_CFG_OFFSET), CP_CFG_COUNT)
         )
 
     async def get_charging_point_status_and_control(
         self, charging_point: int
     ) -> tuple[ChargingPointStatus, ChargingPointControl]:
         """Read status (x232–x299) and control (x300–x308) in one Modbus request."""
-        base = cp_register(charging_point, CP_STATUS_OFFSET)
-        regs = await self._read(base, CP_STATUS_COUNT)
-        # offsets within this read (0 = register x232)
-        status = ChargingPointStatus(
-            charging_point=charging_point,
-            voltage_l1_mv=_u32(regs, 0),
-            voltage_l2_mv=_u32(regs, 2),
-            voltage_l3_mv=_u32(regs, 4),
-            current_l1_ma=_maybe_phase_current(regs, 6),
-            current_l2_ma=_maybe_phase_current(regs, 8),
-            current_l3_ma=_maybe_phase_current(regs, 10),
-            active_power_mw=_u32(regs, 12),
-            reactive_power_mvar=_s32(regs, 14),
-            apparent_power_mva=_u32(regs, 16),
-            energy_active_wh=_u64(regs, 18),
-            energy_reactive_varh=_s64(regs, 22),
-            energy_apparent_vah=_u64(regs, 26),
-            # offsets 30–32: SOC placeholders (skip)
-            last_evcc_id=_ascii(regs, 33, 10),
-            last_rfid=_ascii(regs, 43, 10),
-            connection_time_s=_u32(regs, 53),
-            charging_duration_s=_u32(regs, 55),
-            session_energy_wh=_u64(regs, 57),
-            error_code=_error_code(_u32(regs, 61)),
-            digital_inputs=regs[63],
-            setpoint_percent=regs[64],
-            setpoint_a=regs[65],
-            cable_capacity_a=regs[66],
-            vehicle_status=_vehicle_status(regs[67]),
+        return _decode_cp_status_and_control(
+            charging_point, await self._read(cp_register(charging_point, CP_STATUS_OFFSET), CP_STATUS_COUNT)
         )
-        # Control registers start at offset 68 (absolute x300 → relative to x232 = 68)
-        control = ChargingPointControl(
-            charging_point=charging_point,
-            charging_release=bool(regs[68]),
-            max_current_a=regs[69],
-            digital_outputs=regs[70],
-            locking=bool(regs[71]),
-            available=bool(regs[72]),
-            force_unlock_pending=bool(regs[73]),
-            watchdog_current_a=regs[74],
-            watchdog_timer_s=regs[75],
-        )
-        return status, control
 
     async def fetch_data(self, num_charging_points: int) -> CharxData:
         """Fetch a complete data snapshot for all charging points.
