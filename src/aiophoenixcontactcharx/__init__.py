@@ -41,6 +41,7 @@ from .models import (
     pack_digital_outputs,
 )
 from .registers import RegisterDef, cp_register, offset_of
+from .writing import CharxReleaseModeError, CharxWriteNotConfirmedError
 
 __version__ = version("aiophoenixcontactcharx")
 
@@ -59,7 +60,9 @@ __all__ = [
     "CharxError",
     "CharxInvalidDataError",
     "CharxModbusError",
+    "CharxReleaseModeError",
     "CharxTimeoutError",
+    "CharxWriteNotConfirmedError",
     "ControllerInfo",
     "DeviceInfo",
     "DigitalOutputMode",

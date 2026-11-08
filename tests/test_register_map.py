@@ -110,3 +110,21 @@ def _spans(component: type[Component]) -> tuple[tuple[int, int], ...]:
 def test_the_read_ranges_are_exactly_the_mapped_fields(component: type[Component]) -> None:
     # So a read covers only documented addresses, and every one of them.
     assert component.register_ranges == _spans(component)
+
+
+@pytest.mark.parametrize(("key", "field"), sorted(mapped().items()), ids=str)
+def test_a_field_is_writable_exactly_when_the_manual_says_so(
+    key: tuple[str, int], field: tuple[str, RegisterField[Any]]
+) -> None:
+    name, register = field
+    access = documented()[key].access
+
+    assert bool(register.writable) == ("W" in access), f"{name}: the manual says {access!r}"
+
+
+def test_every_writable_field_writes_with_function_code_16() -> None:
+    # A function code 06 response echoes the old value (docs/errata.md, 167).
+    writable = [(name, field) for name, field in mapped().values() if field.writable]
+
+    assert len(writable) == 10
+    assert [name for name, field in writable if not field.force_fc16] == []

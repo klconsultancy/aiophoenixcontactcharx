@@ -120,6 +120,31 @@ controller.charging_points[0].vehicle_status
 - `ChargingPoint` derives `is_connected`, `is_charging`, `has_error`, `is_unavailable` and
   `watchdog_enabled` from its fields.
 
+## Writes
+
+- A write uses function code 16 (`force_fc16`) and is read back until it has landed.
+  The controller applies a write within about 2 s, and its function code 06 response
+  echoes the old value, which `modbus_connection` rejects (docs/errata.md, 167). A state
+  write reads its whole part again until the field holds the written value, up to 5 s;
+  then it raises `CharxWriteNotConfirmedError`. On return the part's values are current.
+- Each writable field has a validator, so a bad value raises before anything is written:
+  `TypeError` for the wrong type (a `bool` is no int), `ValueError` for a value out of
+  range. A current is 6-80 A, as outside it the controller withdraws the charging
+  release.
+- `ChargingPoint`: `set_charging_release`, `set_available`, `set_max_current`,
+  `set_locked`, `set_digital_outputs` (four `DigitalOutputState`s, output 1 first),
+  `set_watchdog_current`, `set_watchdog_timer` (`None` disables it), and the commands
+  `enforce_unlocking` and `clear_last_rfid`. `Group`: `set_available` and
+  `set_dynamic_max_current` (`None` clears the limit). `CharxController`: the commands
+  `reset` and `system_reset`. A command has no state, so it isn't read back.
+- The charging release and the availability need release mode Modbus. In any other
+  mode, or while the release mode is unread, they raise `CharxReleaseModeError` and write
+  nothing, instead of a write the controller ignores. The Dynamic Max Current has no such
+  condition and works in OCPP release mode (tested), so it is the control for load
+  management next to an OCPP backend.
+- `tests/test_register_map.py` checks that exactly the registers the manual marks
+  writable are, and that each writes with function code 16.
+
 ## Dump CLI
 
 - `aiophoenixcontactcharx dump <host> [--port 502] [-o file.json]` reads every mapped
