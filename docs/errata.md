@@ -3,7 +3,8 @@
 Where the manual (UM EN CHARX SEC, Revision 08, Appendix B3; transcribed in
 [`protocol/B3-modbus.md`](protocol/B3-modbus.md)) contradicts itself, is unclear, or
 differs from what a controller does, and how the map handles it. A dump of a real
-controller decides; until there is one, each entry says what is unverified.
+controller decides: `tests/fixtures/sec3xxx-1.7.3.json` (firmware 1.7.3, one Charging
+Point in OCPP release mode, no vehicle). Each entry says whether that dump confirms it.
 
 ## x302: the coding of the digital outputs
 
@@ -11,7 +12,11 @@ The manual codes each output in 4 bits as 0 undefined, 1 floating, 2 permanent 0
 ("low"), 3 flashing 0 V, 4 pulsating 0 V, 5 permanent 12 V ("high") and 6 flashing 12 V,
 and its example (`0001 0001 0010 0011` = 1 1 2 3) agrees. The 1.x `DigitalOutputMode`
 (0 floating, 1 low, 2 high, 3 flashing, 4 pulsatile) doesn't. `DigitalOutputState`
-follows the manual. Unverified on a controller.
+follows the manual.
+
+**Confirmed by the dump:** the four outputs of an idle controller read `0x1111`, state 1
+each, which is floating in the manual's coding (the state of an output nothing drives)
+and low in 1.x's.
 
 ## 114: Charging Controllers, read as Charging Points
 
@@ -19,6 +24,36 @@ Register 114 counts the Charging Controllers of the system, on the backplane bus
 Ethernet. The map places one Charging Point per Charging Controller, as 1.x did: a
 SEC-3xxx and each SEC-1000 behind it host one Charging Point each. Over Ethernet, clients
 of a Client/Server Group count too, which is out of scope (ADR 0001, 0005).
+
+## 100: the device designation is the controller's name
+
+The manual calls register 100 the "device designation". The dump reads `ev3000`, not a
+model name such as "CHARX SEC-3100"; it is probably the name set for the controller in
+the WBM, which is unverified. 1.x and the Home Assistant integration show it as the
+device's model.
+
+## 167: 65535 while no dynamic limit is set
+
+The manual gives the Dynamic Max Current in A. The dump reads 65535, which no charging
+current is: the controller has no load management limit set. The map reads 65535 as
+`None`.
+
+## x121: the RFID reader's UID is the controller's UID
+
+The manual calls x121 a placeholder that reads 0. The dump reads the same 6 characters
+as x113, the controller's UID.
+
+## x301: 0 outside Modbus release mode
+
+x301 (the maximum charging current, 6-80 A) reads 0 on the dumped controller, whose
+release mode is OCPP, although the manual's range is 6-80. Probably no limit has been set
+over Modbus, which is unverified. The map reads it as it is.
+
+## x305: reads 1 while idle
+
+x305 ("enforce unlocking": 1 performs it) reads 1 on the dumped, idle controller, with
+nothing locked (x303 reads 0). What a read of 1 means is unclear; the map reads it as it
+is, and it is not used for any state.
 
 ## x262: SOC in kWh or Wh
 
@@ -31,6 +66,12 @@ The coding of "reset the last RFID tag" says "Integer [A]", but the register is 
 command: any value above 0 clears x275. It isn't read (see the design's command
 registers).
 
+## x289: the session energy stays after the session
+
+The manual calls x289 the energy of the current charging process. With no vehicle
+connected, the dump reads 42.952 kWh: the value of the last session stays until the next
+one starts.
+
 ## 162: in German
 
 The coding of the total current on L3 is in German ("-1, wenn Phasendrehung =
@@ -40,8 +81,9 @@ unbekannt"); it means the same as 158 and 160: -1 if the phase rotation is unkno
 
 The manual documents -1 ("phase rotation unknown") for the group's total currents only.
 A Charging Point's phase currents (x238-x243) read -1 as `None` too, as 1.x did: no real
-current is -1 mA, so the sentinel can't hide a reading. Unverified whether a controller
-sends it there.
+current is -1 mA, so the sentinel can't hide a reading. The dump has a known phase
+rotation (every total and phase current reads 0), so it doesn't show whether a
+controller sends -1 there.
 
 ## Holding or input registers
 

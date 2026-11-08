@@ -19,7 +19,7 @@ from tmodbus.pdu import ReadHoldingRegistersPDU
 from tmodbus.server import AsyncTcpServer, ModbusRequestRouter
 
 from aiophoenixcontactcharx import CharxController, VehicleStatus, cli
-from tests.conftest import SYNTHETIC
+from tests.conftest import REAL, SYNTHETIC
 
 
 def free_port() -> int:
@@ -112,3 +112,20 @@ async def test_a_refused_register_fails_only_its_charging_point() -> None:
     finally:
         await connection.close()
         await server.stop()
+
+
+async def test_dumps_the_real_controller_as_it_was_dumped(tmp_path: Path) -> None:
+    # The real dump, served back, dumps to the same registers: nothing more, nothing less.
+    holding = REAL["registers"]["holding"]
+    port = free_port()
+    server = AsyncTcpServer("127.0.0.1", router_for(holding), port=port)
+    await server.start()
+    output = tmp_path / "charx.json"
+    try:
+        argv = ["dump", "127.0.0.1", "--port", str(port), "--output", str(output)]
+        status = await asyncio.to_thread(cli.main, argv)
+    finally:
+        await server.stop()
+
+    assert status == 0
+    assert json.loads(output.read_text(encoding="utf-8"))["registers"]["holding"] == holding

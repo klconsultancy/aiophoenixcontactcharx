@@ -59,7 +59,9 @@ Domain terms are defined in [`CONTEXT.md`](../CONTEXT.md).
   controller can report 0 while its meter starts, and a `total_increasing` sensor would
   take that for a meter reset (haphoenixcontactcharx#38). A meter that is in use never
   reads 0; one that has never counted reads `None` until it does. The session energy
-  (x289) is 0 between sessions and stays 0.
+  (x289) reads as it is: it keeps the last session's value until the next one starts.
+- The Dynamic Max Current (167) reads `None` for 65535, which a controller without a
+  dynamic limit reports.
 - Strings are ASCII, two characters per register, null-padded. An IPv4 address takes four
   registers with one octet each (`IPv4OctetsField`; `modbus_connection`'s `IPv4Field`
   packs it into two). A MAC address is `modbus_connection`'s `Eui48Field`, lowercase with
@@ -115,7 +117,14 @@ controller.charging_points[0].vehicle_status
 
 ## Tests
 
-- `tests/fixtures/synthetic-sec3100.json` is a hand-built controller with two Charging
-  Points, until a dump of a real controller replaces it. The tests load it into
-  `modbus_connection`'s mock unit, and `tests/test_end_to_end.py` replays it through an
-  in-process tmodbus server over real Modbus/TCP.
+- `tests/fixtures/sec3xxx-1.7.3.json` is an anonymized dump of a real controller
+  (firmware 1.7.3, one Charging Point, no vehicle). `tests/test_real_controller.py`
+  decodes it, and `tests/test_end_to_end.py` serves it back over Modbus/TCP and checks
+  that the dump command reads exactly the same registers.
+- `tests/fixtures/synthetic-sec3100.json` is hand-built for what the real dump doesn't
+  show: two Charging Points, a vehicle charging, an unknown phase rotation and an error.
+- The tests load the fixtures into `modbus_connection`'s mock unit;
+  `tests/test_end_to_end.py` replays them through an in-process tmodbus server.
+- Anonymize a dump before it becomes a fixture: the device part of the MAC addresses,
+  the IP addresses, the controller UIDs (x113, x116, x121), the last RFID UID (x275) and
+  the EVCC ID (x265).

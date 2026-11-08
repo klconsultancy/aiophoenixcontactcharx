@@ -15,6 +15,17 @@ SYNTHETIC: dict[str, Any] = json.loads(
 )
 
 
+# A real controller, anonymized: firmware 1.7.3, one Charging Point, no vehicle.
+REAL: dict[str, Any] = json.loads((FIXTURES / "sec3xxx-1.7.3.json").read_text(encoding="utf-8"))
+
+
+@pytest.fixture
+def real_unit(mock_modbus_unit: MockModbusUnit) -> MockModbusUnit:
+    """A mock unit that answers like the real controller."""
+    mock_modbus_unit.load_raw(REAL["registers"])
+    return mock_modbus_unit
+
+
 @pytest.fixture
 def controller_unit(mock_modbus_unit: MockModbusUnit) -> MockModbusUnit:
     """A mock unit that answers like the synthetic controller."""

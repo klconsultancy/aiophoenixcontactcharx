@@ -53,6 +53,8 @@ MILLI: Final = 0.001
 _MINUS_ONE_32: Final = 0xFFFF_FFFF
 # A watchdog timer of 65535 s disables the watchdog (x307).
 WATCHDOG_DISABLED: Final = 65535
+# What the Dynamic Max Current (167) reads while no limit is set.
+NOT_SET: Final = 0xFFFF
 
 
 class ControllerInfo(Component):
@@ -107,7 +109,8 @@ class Group(Component):
 
     # Controls
     available = boolean(164)
-    dynamic_max_current = integer(167, signed=False, unit="A")
+    # 65535 while no dynamic limit is set (docs/errata.md), which reads None.
+    dynamic_max_current = integer(167, signed=False, nan=NOT_SET, unit="A")
 
 
 class ChargingPoint(Component):
@@ -140,7 +143,8 @@ class ChargingPoint(Component):
     server_uid = string(116, 3)
     bus_position = integer(119, signed=False)
     release_mode = enum(120, ReleaseMode)
-    rfid_reader_uid = string(121, 3)  # placeholder, reads empty
+    # The manual calls it a placeholder that reads 0; a 1.7.3 controller repeats x113.
+    rfid_reader_uid = string(121, 3)
 
     # Status: x232 to x299. A phase current reads None for the -1 of an unknown phase
     # rotation, as the Group's totals do.
