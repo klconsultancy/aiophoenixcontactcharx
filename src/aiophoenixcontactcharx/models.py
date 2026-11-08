@@ -3,48 +3,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import IntEnum, IntFlag, StrEnum
+from enum import IntEnum
+
+# Re-exported for the 1.x API (client.py, the tests); the enums live in enums.py.
+from .enums import (
+    EnergyMeterType as EnergyMeterType,
+    ErrorCode as ErrorCode,
+    ModemRegistration as ModemRegistration,
+    ModemSignalQuality as ModemSignalQuality,
+    OvercurrentMonitoring as OvercurrentMonitoring,
+    ReleaseMode as ReleaseMode,
+    TempMonitoring as TempMonitoring,
+    VehicleStatus as VehicleStatus,
+)
 
 # ---------------------------------------------------------------------------
 # Enumerations (values match the Modbus register encoding from the manual)
 # ---------------------------------------------------------------------------
-
-
-class ErrorCode(IntFlag):
-    """32-bit error bitmask from registers x293–x294 (Appendix B1).
-
-    Bit numbering: Python uses 0-based (bit N = 1 << N); the manual uses
-    1-based (manual bit M = Python bit M-1).
-
-    Reserved (unused) bits:
-      - Python bit 2  (manual bit 3)
-      - Python bits 7–15  (manual bits 8–16)
-
-    Unknown bits from future firmware are preserved and trigger a WARNING log.
-    """
-
-    TEMPERATURE_TOO_HIGH = 1 << 0
-    TEMPERATURE_DERATING = 1 << 1
-    CONFIGURATION_ERROR = 1 << 3
-    LOAD_MANAGEMENT_PAUSED = 1 << 4
-    EVENT_ACTIONS_UNCLEAR = 1 << 5
-    RFID_READER_ERROR = 1 << 6
-    CONNECTOR_13A_20A_REJECTED = 1 << 16
-    CONNECTOR_13A_REJECTED = 1 << 17
-    PP_ERROR = 1 << 18
-    CP_ERROR = 1 << 19
-    VEHICLE_ERROR_F = 1 << 20
-    LOCKING_ERROR = 1 << 21
-    LOCK_RELEASE_ERROR = 1 << 22
-    UNKNOWN_LOCKING_STATE = 1 << 23
-    OVERCURRENT_DETECTED = 1 << 24
-    ENERGY_METER_COMM_ERROR = 1 << 25
-    INVALID_STATUS_D = 1 << 26
-    CONTACTOR_ERROR = 1 << 27
-    EV_DIODE_ERROR = 1 << 28
-    POWER_SUPPLY_ERROR = 1 << 29
-    RESIDUAL_CURRENT_TRIP = 1 << 30
-    RESIDUAL_CURRENT_SENSOR_ERROR = 1 << 31
 
 
 class DigitalOutputMode(IntEnum):
@@ -67,72 +42,6 @@ def pack_digital_outputs(
     return (
         ((int(o4) & 0xF) << 12) | ((int(o3) & 0xF) << 8) | ((int(o2) & 0xF) << 4) | (int(o1) & 0xF)
     )
-
-
-class ReleaseMode(IntEnum):
-    DASHBOARD = 0
-    LOCAL_WHITELIST = 1
-    EXTERNAL_CONTROL = 2
-    PERMANENT = 3
-    OCPP = 4
-    MODBUS = 5
-
-
-class EnergyMeterType(IntEnum):
-    NONE = 0
-    EEM_350_D_MCB = 1
-    EEM_EM357 = 2
-    CARLO_GAVAZZI_EM24 = 3
-    EEM_EM357_EE = 4
-    CARLO_GAVAZZI_EM340 = 6
-    ISKRA_WM3M4 = 11
-    INEPRO_PRO380 = 12
-    UNKNOWN = 65535
-
-
-class ModemRegistration(IntEnum):
-    NOT_REGISTERED = 0
-    REGISTERED = 1
-    SEARCHING = 2
-    DENIED = 3
-    UNKNOWN = 4
-
-
-class ModemSignalQuality(IntEnum):
-    UNKNOWN = 0
-    INADEQUATE_TO_NONE = 1
-    INADEQUATE = 2
-    OK = 3
-    GOOD = 4
-    EXCELLENT = 5
-
-
-class OvercurrentMonitoring(IntEnum):
-    OFF = 0
-    PCT120_10S = 1
-    EV_ZE_READY = 2
-
-
-class TempMonitoring(IntEnum):
-    INACTIVE = 0
-    PT1000 = 1
-    PTC = 2
-
-
-class VehicleStatus(StrEnum):
-    """IEC 61851-1 two-character state codes reported by register X299."""
-
-    A1 = "A1"  # Not connected — supply available
-    A2 = "A2"  # Not connected — supply not available
-    B1 = "B1"  # Connected — supply available
-    B2 = "B2"  # Connected — supply not available
-    C1 = "C1"  # Charging request — no ventilation required
-    C2 = "C2"  # Charging active
-    D1 = "D1"  # Charging request with ventilation — no ventilation available
-    D2 = "D2"  # Charging active with ventilation
-    E0 = "E0"  # Error
-    F0 = "F0"  # Not available (status F)
-    IN = "IN"  # Initialising
 
 
 # ---------------------------------------------------------------------------
