@@ -114,15 +114,60 @@ last RFID UID.
 
 - `fetch_data()` becomes `async_update()`, which returns an `UpdateReport` instead of
   raising on every Modbus error.
-- `data.device_info` becomes `controller.device_info` (identity and network) and
-  `controller.group` (counts, totals, controls). `cp.status.x`, `cp.config.x` and
-  `cp.control.x` become `cp.x`.
-- Values are in V, A, W and kWh instead of mV, mA, mW and Wh.
+- The parts move, and most fields are renamed: they drop their unit suffix, as values are
+  now in V, A, W and kWh rather than mV, mA, mW and Wh, and follow the manual's meaning.
 - A MAC address is lowercase.
 - `DigitalOutputMode` and `pack_digital_outputs` become `DigitalOutputState` and
   `cp.set_digital_outputs(...)`, which follow the manual's coding (1.x's was wrong).
 - The `CharxConnectionError` family becomes `modbus_connection`'s exceptions.
 - Python 3.12 is the minimum, and `pymodbus` is no longer a dependency.
+
+**Reading** (`cp` is a Charging Point: `data.charging_points[i]` in 1.x,
+`controller.charging_points[i]` in 2.0)
+
+| 1.x | 2.0 |
+|---|---|
+| `data.device_info.designation`, `software_version`, `mac_eth0`, `ip_eth0`, `modem_registration` | `controller.device_info.` the same name |
+| `data.device_info.num_controllers` | `controller.device_info.charging_controllers` |
+| `data.device_info.subnet_eth0` | `controller.device_info.subnet_mask_eth0` |
+| `data.device_info.group_active_power_w` (`_mw`), `group_reactive_power_var`, `group_apparent_power_va` | `controller.group.active_power`, `reactive_power`, `apparent_power` |
+| `data.device_info.group_current_l1_a` (`_ma`) | `controller.group.current_l1` |
+| `data.device_info.num_charging`, `num_status_a`, `num_status_bcd`, `num_status_ef`, `num_non_critical_error` | `controller.group.charging`, `status_a`, `status_b_c_or_d`, `status_e_or_f`, `non_critical_errors` |
+| `data.device_info.availability` | `controller.group.available` |
+| `data.device_info.dynamic_max_current_a` | `controller.group.dynamic_max_current` (`None` while no limit is set) |
+| `cp.config.interface_config` (int) | `cp.interface` (`ChargingInterface`) |
+| `cp.config.max_current_cfg_a`, `min_current_cfg_a` | `cp.max_current_config`, `min_current_config` |
+| `cp.config.temp_lower_thr_c`, `temp_upper_thr_c` | `cp.derating_start_temperature`, `derating_stop_temperature` |
+| `cp.config.current_derating_start_a`, `current_derating_stop_a` | `cp.derating_start_current`, `derating_stop_current` |
+| `cp.config.temp_monitoring`, `proximity_cfg` | `cp.temperature_monitoring`, `proximity_configuration` |
+| `cp.config.rcm_configured`, `accept_status_d`, `overcurrent_monitoring`, `energy_meter_type`, `uid`, `server_uid`, `bus_position`, `release_mode` | `cp.` the same name |
+| `cp.status.voltage_l1_v` (`_mv`), `current_l1_a` (`_ma`) | `cp.voltage_l1`, `cp.current_l1` |
+| `cp.status.active_power_w` (`_mw`), `reactive_power_var`, `apparent_power_va` | `cp.active_power`, `reactive_power`, `apparent_power` |
+| `cp.status.energy_active_kwh` (`_wh`), `energy_reactive_varh`, `energy_apparent_vah` | `cp.active_energy`, `reactive_energy`, `apparent_energy` (kWh, kvarh, kVAh) |
+| `cp.status.session_energy_kwh` (`_wh`) | `cp.session_energy` |
+| `cp.status.connection_time_s`, `charging_duration_s` | `cp.connection_time`, `charging_duration` |
+| `cp.status.last_rfid`, `last_evcc_id` | `cp.rfid_uid`, `evcc_id` |
+| `cp.status.setpoint_a`, `setpoint_percent`, `cable_capacity_a` | `cp.charging_current`, `charging_current_duty_cycle`, `cable_capacity` |
+| `cp.status.error_code`, `digital_inputs`, `vehicle_status` | `cp.` the same name |
+| `cp.control.charging_release`, `available`, `digital_outputs` | `cp.` the same name |
+| `cp.control.max_current_a`, `locking`, `force_unlock_pending` | `cp.max_current`, `locked`, `force_unlock` |
+| `cp.control.watchdog_current_a`, `watchdog_timer_s` | `cp.watchdog_current`, `watchdog_timer` |
+| `cp.is_connected`, `is_charging`, `has_error`, `is_unavailable` | `cp.` the same name |
+
+**Controlling**
+
+| 1.x | 2.0 |
+|---|---|
+| `client.set_charging_release(n, enabled)` | `cp.set_charging_release(enabled)` |
+| `client.set_max_current(n, current_a)` | `cp.set_max_current(amps)` |
+| `client.set_availability(n, available)` | `cp.set_available(available)` |
+| `client.set_locking(n, locked)` | `cp.set_locked(locked)` |
+| `client.set_digital_outputs(n, value)` | `cp.set_digital_outputs(state_1, state_2, state_3, state_4)` |
+| `client.set_watchdog(...)` | `cp.set_watchdog_current(amps)`, `cp.set_watchdog_timer(seconds)` (`None` disables) |
+| `client.force_unlock(n)` | `cp.enforce_unlocking()` |
+| `client.reset_last_rfid(n)` | `cp.clear_last_rfid()` |
+| `client.set_group_availability(available)` | `controller.group.set_available(available)` |
+| `client.set_dynamic_max_current(current_a)` | `controller.group.set_dynamic_max_current(amps)` (`None` clears) |
 
 ## Development
 
