@@ -35,8 +35,11 @@ code 06 (write single register):
 
 The write API therefore writes with function code 16 (write multiple registers,
 `force_fc16=True`), whose response echoes only the address and the count, and reads the
-register back until the value has landed. Whether the controller answers function code
-16 correctly is not yet tested.
+register back until the value has landed.
+
+**Confirmed on the dumped controller:** a function code 16 write of 16 through
+`Group.set_dynamic_max_current` was answered without error and read back after 0.6 s;
+restoring 65535 (`None`) read back after 1.8 s.
 
 ## x300, x303, x304: writable only when configured
 
