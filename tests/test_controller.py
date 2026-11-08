@@ -331,3 +331,23 @@ async def test_a_failed_setup_is_retried(controller_unit: MockModbusUnit) -> Non
 
     assert report.complete
     assert len(controller.charging_points) == SYNTHETIC["registers"]["holding"]["114"]
+
+
+async def test_a_refused_identity_register_fails_only_the_device_info(
+    controller_unit: MockModbusUnit,
+) -> None:
+    controller_unit.fail_read(145, IllegalDataAddressError(3))
+    controller = CharxController(controller_unit)
+
+    report = await controller.async_update()
+
+    assert set(report.failed) == {"device_info"}
+    assert report.updated == {"group", charging_point_name(1), charging_point_name(2)}
+
+
+async def test_the_setup_reads_only_the_count(controller_unit: MockModbusUnit) -> None:
+    controller = CharxController(controller_unit)
+
+    await controller.async_ensure_setup()
+
+    assert [(event.address, event.count) for event in controller_unit.read_events] == [(114, 1)]

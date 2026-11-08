@@ -225,6 +225,13 @@ class ChargingPoint(Component):
         return self.watchdog_timer != WATCHDOG_DISABLED
 
 
+class _ChargingControllerCount(Component):
+    """Register 114 on its own, which the setup reads to place the Charging Points."""
+
+    register_ranges = ((114, 114),)
+    charging_controllers = integer(114, signed=False)
+
+
 def charging_point_name(number: int) -> str:
     """Return the name of Charging Point ``number`` in an ``UpdateReport``."""
     return f"charging_point_{number}"
@@ -260,9 +267,14 @@ class CharxController(Device):
         )
 
     async def _async_setup(self) -> None:
-        """Read the identity and place a Charging Point per Charging Controller."""
-        await self.device_info.async_update(notify=False)
-        count = self.device_info.charging_controllers or 0
+        """Place a Charging Point per Charging Controller.
+
+        Reads register 114 only: a refused identity register then fails ``device_info``
+        in the report instead of the whole update (ADR 0006).
+        """
+        counter = _ChargingControllerCount(self.modbus_unit)
+        await counter.async_update(notify=False)
+        count = counter.charging_controllers or 0
         if count > MAX_CHARGING_POINTS:
             _LOGGER.warning(
                 "The controller reports %d Charging Controllers; reading the first %d",

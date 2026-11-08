@@ -25,9 +25,19 @@ UNIT_ID = 1
 
 
 def _json_value(value: object) -> object:
-    """Convert a decoded value to JSON: a flag to its member names, an enum to its name."""
+    """Convert a decoded value to JSON: a flag to its member names, an enum to its name.
+
+    A flag's bits that have no name (reserved, or new in a firmware) follow its names as
+    one hexadecimal number, so a dump never hides an error bit.
+    """
     if isinstance(value, Flag):
-        return [member.name for member in value]
+        names: list[object] = [member.name for member in value]
+        named = 0
+        for member in type(value):
+            named |= member.value
+        if unnamed := value.value & ~named:
+            names.append(f"0x{unnamed:08X}")
+        return names
     if isinstance(value, Enum):
         return value.name
     if isinstance(value, IPv4Address):

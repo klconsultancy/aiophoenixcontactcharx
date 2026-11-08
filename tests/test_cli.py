@@ -33,6 +33,38 @@ async def test_dump_holds_the_registers_and_the_values(controller_unit: MockModb
     json.dumps(dump)  # serializable as it is
 
 
+async def test_dump_keeps_the_unnamed_bits_of_the_error_code(
+    controller_unit: MockModbusUnit,
+) -> None:
+    # Bit 2 is reserved; bit 6 is the RFID reader error.
+    controller_unit.holding[2294] = 0x44
+
+    dump = await cli.dump(controller_unit)
+
+    assert dump["values"]["charging_point_2"]["error_code"] == ["RFID_READER_ERROR", "0x00000004"]
+
+
+async def test_dump_shows_an_error_code_of_only_unnamed_bits(
+    controller_unit: MockModbusUnit,
+) -> None:
+    controller_unit.holding[2294] = 0x04
+
+    dump = await cli.dump(controller_unit)
+
+    assert dump["values"]["charging_point_2"]["error_code"] == ["0x00000004"]
+
+
+async def test_dump_survives_a_refused_identity_register(
+    controller_unit: MockModbusUnit,
+) -> None:
+    controller_unit.fail_read(145, IllegalDataAddressError(3))
+
+    dump = await cli.dump(controller_unit)
+
+    assert set(dump["failed"]) == {"device_info"}
+    assert {"group", "charging_point_1", "charging_point_2"} <= set(dump["values"])
+
+
 async def test_dump_reads_only_mapped_addresses(controller_unit: MockModbusUnit) -> None:
     dump = await cli.dump(controller_unit)
 
