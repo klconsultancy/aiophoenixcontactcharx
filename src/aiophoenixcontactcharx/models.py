@@ -5,10 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import IntEnum, IntFlag, StrEnum
 
-
 # ---------------------------------------------------------------------------
 # Enumerations (values match the Modbus register encoding from the manual)
 # ---------------------------------------------------------------------------
+
 
 class ErrorCode(IntFlag):
     """32-bit error bitmask from registers x293–x294 (Appendix B1).
@@ -22,35 +22,38 @@ class ErrorCode(IntFlag):
 
     Unknown bits from future firmware are preserved and trigger a WARNING log.
     """
-    TEMPERATURE_TOO_HIGH          = 1 << 0
-    TEMPERATURE_DERATING          = 1 << 1
-    CONFIGURATION_ERROR           = 1 << 3
-    LOAD_MANAGEMENT_PAUSED        = 1 << 4
-    EVENT_ACTIONS_UNCLEAR         = 1 << 5
-    RFID_READER_ERROR             = 1 << 6
-    CONNECTOR_13A_20A_REJECTED    = 1 << 16
-    CONNECTOR_13A_REJECTED        = 1 << 17
-    PP_ERROR                      = 1 << 18
-    CP_ERROR                      = 1 << 19
-    VEHICLE_ERROR_F               = 1 << 20
-    LOCKING_ERROR                 = 1 << 21
-    LOCK_RELEASE_ERROR            = 1 << 22
-    UNKNOWN_LOCKING_STATE         = 1 << 23
-    OVERCURRENT_DETECTED          = 1 << 24
-    ENERGY_METER_COMM_ERROR       = 1 << 25
-    INVALID_STATUS_D              = 1 << 26
-    CONTACTOR_ERROR               = 1 << 27
-    EV_DIODE_ERROR                = 1 << 28
-    POWER_SUPPLY_ERROR            = 1 << 29
-    RESIDUAL_CURRENT_TRIP         = 1 << 30
+
+    TEMPERATURE_TOO_HIGH = 1 << 0
+    TEMPERATURE_DERATING = 1 << 1
+    CONFIGURATION_ERROR = 1 << 3
+    LOAD_MANAGEMENT_PAUSED = 1 << 4
+    EVENT_ACTIONS_UNCLEAR = 1 << 5
+    RFID_READER_ERROR = 1 << 6
+    CONNECTOR_13A_20A_REJECTED = 1 << 16
+    CONNECTOR_13A_REJECTED = 1 << 17
+    PP_ERROR = 1 << 18
+    CP_ERROR = 1 << 19
+    VEHICLE_ERROR_F = 1 << 20
+    LOCKING_ERROR = 1 << 21
+    LOCK_RELEASE_ERROR = 1 << 22
+    UNKNOWN_LOCKING_STATE = 1 << 23
+    OVERCURRENT_DETECTED = 1 << 24
+    ENERGY_METER_COMM_ERROR = 1 << 25
+    INVALID_STATUS_D = 1 << 26
+    CONTACTOR_ERROR = 1 << 27
+    EV_DIODE_ERROR = 1 << 28
+    POWER_SUPPLY_ERROR = 1 << 29
+    RESIDUAL_CURRENT_TRIP = 1 << 30
     RESIDUAL_CURRENT_SENSOR_ERROR = 1 << 31
+
 
 class DigitalOutputMode(IntEnum):
     """4-bit output mode for one digital output channel (register X302, 4 bits per channel)."""
-    FLOATING  = 0
-    LOW       = 1
-    HIGH      = 2
-    FLASHING  = 3
+
+    FLOATING = 0
+    LOW = 1
+    HIGH = 2
+    FLASHING = 3
     PULSATILE = 4
 
 
@@ -61,7 +64,9 @@ def pack_digital_outputs(
     o4: DigitalOutputMode,
 ) -> int:
     """Pack four output modes into the 16-bit X302 register word (o1 in bits 3–0)."""
-    return ((int(o4) & 0xF) << 12) | ((int(o3) & 0xF) << 8) | ((int(o2) & 0xF) << 4) | (int(o1) & 0xF)
+    return (
+        ((int(o4) & 0xF) << 12) | ((int(o3) & 0xF) << 8) | ((int(o2) & 0xF) << 4) | (int(o1) & 0xF)
+    )
 
 
 class ReleaseMode(IntEnum):
@@ -116,6 +121,7 @@ class TempMonitoring(IntEnum):
 
 class VehicleStatus(StrEnum):
     """IEC 61851-1 two-character state codes reported by register X299."""
+
     A1 = "A1"  # Not connected — supply available
     A2 = "A2"  # Not connected — supply not available
     B1 = "B1"  # Connected — supply available
@@ -132,6 +138,7 @@ class VehicleStatus(StrEnum):
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class DeviceInfo:
@@ -162,7 +169,7 @@ class DeviceInfo:
     group_active_power_mw: int = 0
     group_reactive_power_mvar: int = 0
     group_apparent_power_mva: int = 0
-    group_current_l1_ma: int | None = None   # None when phase rotation unknown
+    group_current_l1_ma: int | None = None  # None when phase rotation unknown
     group_current_l2_ma: int | None = None
     group_current_l3_ma: int | None = None
 
@@ -200,7 +207,7 @@ class ChargingPointConfig:
     """Configuration data from registers x100–x121."""
 
     charging_point: int = 1
-    interface_config: int = 0          # 0=socket, 1=connector
+    interface_config: int = 0  # 0=socket, 1=connector
     max_current_cfg_a: int = 0
     min_current_cfg_a: int = 0
     rcm_configured: bool = False
@@ -229,16 +236,16 @@ class ChargingPointStatus:
     voltage_l1_mv: int = 0
     voltage_l2_mv: int = 0
     voltage_l3_mv: int = 0
-    current_l1_ma: int | None = None   # None when phase rotation unknown
+    current_l1_ma: int | None = None  # None when phase rotation unknown
     current_l2_ma: int | None = None
     current_l3_ma: int | None = None
     active_power_mw: int = 0
-    reactive_power_mvar: int = 0        # signed
+    reactive_power_mvar: int = 0  # signed
     apparent_power_mva: int = 0
 
     # Energy counters [Wh / VARh / VAh]
     energy_active_wh: int = 0
-    energy_reactive_varh: int = 0       # signed
+    energy_reactive_varh: int = 0  # signed
     energy_apparent_vah: int = 0
     session_energy_wh: int = 0
 
@@ -314,7 +321,7 @@ class ChargingPointControl:
     available: bool = True
     force_unlock_pending: bool = False  # X305: 1 while unlock in progress; firmware clears to 0
     watchdog_current_a: int = 16
-    watchdog_timer_s: int = 65535       # 65535 = disabled
+    watchdog_timer_s: int = 65535  # 65535 = disabled
 
 
 @dataclass
@@ -329,7 +336,11 @@ class ChargingPointData:
     @property
     def is_connected(self) -> bool:
         """True when a vehicle is physically connected (status B/C/D/E/F); A1, A2, and IN are excluded."""
-        return self.status.vehicle_status not in (VehicleStatus.A1, VehicleStatus.A2, VehicleStatus.IN)
+        return self.status.vehicle_status not in (
+            VehicleStatus.A1,
+            VehicleStatus.A2,
+            VehicleStatus.IN,
+        )
 
     @property
     def is_charging(self) -> bool:

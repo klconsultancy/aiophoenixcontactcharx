@@ -8,34 +8,92 @@ version = "1.0.0"
 description = "Async Python library for Phoenix Contact CHARX SEC EV charging controllers via Modbus/TCP"
 readme = "README.md"
 license = { text = "MIT" }
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 keywords = ["ev", "charger", "phoenix-contact", "charx", "modbus", "home-automation"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Home Automation",
+    "Typing :: Typed",
 ]
 dependencies = [
     "pymodbus>=3.7.0",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.0",
-    "pytest-asyncio>=0.23",
-    "pytest-cov",
-]
 
 [project.urls]
 Homepage = "https://github.com/klconsultancy/aiophoenixcontactcharx"
 Issues = "https://github.com/klconsultancy/aiophoenixcontactcharx/issues"
+Changelog = "https://github.com/klconsultancy/aiophoenixcontactcharx/blob/main/CHANGELOG.md"
+
+[dependency-groups]
+dev = [
+    "mypy",
+    "prek",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "ruff",
+]
+# Not a default group: only the CI build job needs it.
+release = ["twine"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["aiophoenixcontactcharx"]
+packages = ["src/aiophoenixcontactcharx"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+extend-exclude = [".claude", "docs"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "COM812", # conflicts with the formatter
+    "CPY",    # no per-file copyright headers; the license is in LICENSE
+    "D203",   # incompatible with D211
+    "D213",   # incompatible with D212
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "D",       # test names document themselves
+    "PLR2004", # magic values are expected in assertions
+    "S101",    # assert is how pytest works
+]
+# The 1.x code, which the 2.0.0 rewrite (#47) replaces file by file. New code, and every
+# file the rewrite touches, follows the full rule set: drop its line here.
+"src/aiophoenixcontactcharx/client.py" = ["ALL"]
+"src/aiophoenixcontactcharx/models.py" = ["ALL"]
+"src/aiophoenixcontactcharx/registers.py" = ["ALL"]
+"tests/helpers.py" = ["ALL"]
+"tests/test_client.py" = ["ALL"]
+"tests/test_decoding.py" = ["ALL"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "--strict-markers --cov --cov-report=term-missing"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["aiophoenixcontactcharx"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

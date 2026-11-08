@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from enum import IntEnum
 from types import TracebackType
-from typing import Any, TypeVar
+from typing import TypeVar
 
 from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.exceptions import ModbusException
@@ -14,14 +14,13 @@ from .exceptions import (
     CharxConnectionError,
     CharxInvalidDataError,
     CharxModbusError,
-    CharxTimeoutError,
 )
 from .models import (
-    CharxData,
     ChargingPointConfig,
     ChargingPointControl,
     ChargingPointData,
     ChargingPointStatus,
+    CharxData,
     DeviceInfo,
     EnergyMeterType,
     ErrorCode,
@@ -57,7 +56,7 @@ from .registers import (
 
 _LOGGER = logging.getLogger(__name__)
 
-_UNIT_ID = 1       # CHARX always answers on Modbus address 1
+_UNIT_ID = 1  # CHARX always answers on Modbus address 1
 _DEFAULT_PORT = 502
 _DEFAULT_TIMEOUT = 10  # seconds
 
@@ -65,6 +64,7 @@ _DEFAULT_TIMEOUT = 10  # seconds
 # ---------------------------------------------------------------------------
 # Helper functions for converting raw Modbus register lists
 # ---------------------------------------------------------------------------
+
 
 def _u32(regs: list[int], offset: int) -> int:
     """Unsigned 32-bit from two consecutive 16-bit registers (MSW first)."""
@@ -115,7 +115,9 @@ def _vehicle_status(reg: int) -> VehicleStatus:
         try:
             return VehicleStatus(code)
         except ValueError:
-            _LOGGER.warning("Unrecognised vehicle status code %r from register; defaulting to IN", code)
+            _LOGGER.warning(
+                "Unrecognised vehicle status code %r from register; defaulting to IN", code
+            )
             return VehicleStatus.IN
     return VehicleStatus.A1
 
@@ -129,7 +131,9 @@ def _decode_enum(raw: int, enum_type: type[_E], fallback: _E) -> _E:
         return enum_type(raw)
     _LOGGER.warning(
         "Unrecognised %s value %d; defaulting to %s",
-        enum_type.__name__, raw, fallback.name,
+        enum_type.__name__,
+        raw,
+        fallback.name,
     )
     return fallback
 
@@ -143,7 +147,9 @@ del _m
 def _error_code(raw: int) -> ErrorCode:
     unknown = raw & ~_KNOWN_ERROR_CODE_BITS
     if unknown:
-        _LOGGER.warning("ErrorCode: unrecognised bits 0x%08X in value 0x%08X; passing through", unknown, raw)
+        _LOGGER.warning(
+            "ErrorCode: unrecognised bits 0x%08X in value 0x%08X; passing through", unknown, raw
+        )
     return ErrorCode(raw)
 
 
@@ -170,6 +176,7 @@ def _maybe_phase_current(regs: list[int], offset: int) -> int | None:
 # ---------------------------------------------------------------------------
 # Pure decoder functions (no I/O; accept raw register arrays)
 # ---------------------------------------------------------------------------
+
 
 def _decode_device_info(regs: list[int]) -> DeviceInfo:
     """Decode global registers 100–167 into a DeviceInfo (offset 0 = register 100)."""
@@ -218,7 +225,9 @@ def _decode_cp_config(charging_point: int, regs: list[int]) -> ChargingPointConf
         temp_monitoring=_decode_enum(regs[8], TempMonitoring, TempMonitoring.INACTIVE),
         accept_status_d=bool(regs[9]),
         proximity_cfg=regs[10],
-        overcurrent_monitoring=_decode_enum(regs[11], OvercurrentMonitoring, OvercurrentMonitoring.OFF),
+        overcurrent_monitoring=_decode_enum(
+            regs[11], OvercurrentMonitoring, OvercurrentMonitoring.OFF
+        ),
         energy_meter_type=_decode_enum(regs[12], EnergyMeterType, EnergyMeterType.UNKNOWN),
         uid=_ascii(regs, 13, 3),
         server_uid=_ascii(regs, 16, 3),
@@ -275,6 +284,7 @@ def _decode_cp_status_and_control(
 # CharxClient
 # ---------------------------------------------------------------------------
 
+
 class CharxClient:
     """Async Modbus/TCP client for a CHARX SEC-3xxx charging controller.
 
@@ -312,9 +322,7 @@ class CharxClient:
                 f"Cannot connect to CHARX at {self._host}:{self._port}: {err}"
             ) from err
         if not connected:
-            raise CharxConnectionError(
-                f"Cannot connect to CHARX at {self._host}:{self._port}"
-            )
+            raise CharxConnectionError(f"Cannot connect to CHARX at {self._host}:{self._port}")
         _LOGGER.debug("Connected to CHARX at %s:%d", self._host, self._port)
 
     async def disconnect(self) -> None:
@@ -326,7 +334,7 @@ class CharxClient:
         """True when the underlying transport is open."""
         return self._client.connected
 
-    async def __aenter__(self) -> "CharxClient":
+    async def __aenter__(self) -> CharxClient:
         await self.connect()
         return self
 
@@ -358,9 +366,7 @@ class CharxClient:
                 device_id=_UNIT_ID,
             )
         except ModbusException as err:
-            raise CharxModbusError(
-                f"Modbus error reading {address}+{count}: {err}"
-            ) from err
+            raise CharxModbusError(f"Modbus error reading {address}+{count}: {err}") from err
         except Exception as err:
             raise CharxConnectionError(
                 f"Connection error reading {address}+{count}: {err}"
@@ -376,7 +382,7 @@ class CharxClient:
                 f"Expected {count} registers at {address}, got {len(result.registers)}"
             )
 
-        return result.registers
+        return list(result.registers)
 
     async def _write_register(self, address: int, value: int) -> None:
         """Write a single holding register."""
@@ -389,18 +395,14 @@ class CharxClient:
                 device_id=_UNIT_ID,
             )
         except ModbusException as err:
-            raise CharxModbusError(
-                f"Modbus error writing {address}={value}: {err}"
-            ) from err
+            raise CharxModbusError(f"Modbus error writing {address}={value}: {err}") from err
         except Exception as err:
             raise CharxConnectionError(
                 f"Connection error writing {address}={value}: {err}"
             ) from err
 
         if result.isError():
-            raise CharxModbusError(
-                f"Device returned exception writing {address}={value}: {result}"
-            )
+            raise CharxModbusError(f"Device returned exception writing {address}={value}: {result}")
 
     # ------------------------------------------------------------------
     # Parsed reads
@@ -410,12 +412,11 @@ class CharxClient:
         """Read global registers 100–167 and return a DeviceInfo snapshot."""
         return _decode_device_info(await self._read(GLOBAL_BASE, GLOBAL_COUNT))
 
-    async def get_charging_point_config(
-        self, charging_point: int
-    ) -> ChargingPointConfig:
+    async def get_charging_point_config(self, charging_point: int) -> ChargingPointConfig:
         """Read configuration registers for one charging point."""
         return _decode_cp_config(
-            charging_point, await self._read(cp_register(charging_point, CP_CFG_OFFSET), CP_CFG_COUNT)
+            charging_point,
+            await self._read(cp_register(charging_point, CP_CFG_OFFSET), CP_CFG_COUNT),
         )
 
     async def get_charging_point_status_and_control(
@@ -423,7 +424,8 @@ class CharxClient:
     ) -> tuple[ChargingPointStatus, ChargingPointControl]:
         """Read status (x232–x299) and control (x300–x308) in one Modbus request."""
         return _decode_cp_status_and_control(
-            charging_point, await self._read(cp_register(charging_point, CP_STATUS_OFFSET), CP_STATUS_COUNT)
+            charging_point,
+            await self._read(cp_register(charging_point, CP_STATUS_OFFSET), CP_STATUS_COUNT),
         )
 
     async def fetch_data(self, num_charging_points: int) -> CharxData:
@@ -452,9 +454,7 @@ class CharxClient:
     # Control writes
     # ------------------------------------------------------------------
 
-    async def set_charging_release(
-        self, charging_point: int, enabled: bool
-    ) -> None:
+    async def set_charging_release(self, charging_point: int, enabled: bool) -> None:
         """Enable or disable charging release for a charging point.
 
         The charging point must be configured for Modbus release mode.
@@ -472,16 +472,12 @@ class CharxClient:
             raise ValueError(f"Max current must be 6–80 A, got {current_a}")
         await self._write_register(cp_register(charging_point, CP_MAX_CURRENT), current_a)
 
-    async def set_availability(
-        self, charging_point: int, available: bool
-    ) -> None:
+    async def set_availability(self, charging_point: int, available: bool) -> None:
         """Set charging point availability (status F).
 
         The charging point must be configured for Modbus release mode.
         """
-        await self._write_register(
-            cp_register(charging_point, CP_STATUS_F), int(bool(available))
-        )
+        await self._write_register(cp_register(charging_point, CP_STATUS_F), int(bool(available)))
 
     async def set_locking(self, charging_point: int, locked: bool) -> None:
         """Lock or unlock the charging connector (standard path, register X303).
@@ -489,9 +485,7 @@ class CharxClient:
         The charging point must be configured for external locking mode.
         For the emergency unlock path see force_unlock().
         """
-        await self._write_register(
-            cp_register(charging_point, CP_LOCKING), int(bool(locked))
-        )
+        await self._write_register(cp_register(charging_point, CP_LOCKING), int(bool(locked)))
 
     async def set_digital_outputs(self, charging_point: int, value: int) -> None:
         """Write the packed digital output register (X302).
@@ -535,9 +529,7 @@ class CharxClient:
             await self._write_register(
                 cp_register(charging_point, CP_WATCHDOG_CURRENT), fallback_current_a
             )
-        await self._write_register(
-            cp_register(charging_point, CP_WATCHDOG_TIMER), timer_s
-        )
+        await self._write_register(cp_register(charging_point, CP_WATCHDOG_TIMER), timer_s)
 
     async def force_unlock(self, charging_point: int) -> None:
         """Force-unlock the charging connector."""

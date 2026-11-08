@@ -4,22 +4,9 @@ These functions are pure (no I/O) so they run without any Modbus connection.
 """
 
 import logging
+
 import pytest
-from aiophoenixcontactcharx.models import ErrorCode, ModemRegistration, ModemSignalQuality, ReleaseMode, VehicleStatus
-from aiophoenixcontactcharx.registers import (
-    CP_CHARGING_RELEASE,
-    CP_ERROR_CODE,
-    CP_EVCC_ID,
-    CP_VEHICLE_STATUS,
-    CP_VOLTAGE_L1,
-    CP_CFG_COUNT,
-    CP_STATUS_COUNT,
-    DEVICE_DESIGNATION,
-    GLOBAL_COUNT,
-    MODEM_REGISTRATION,
-    cp_register,
-    offset_of,
-)
+
 from aiophoenixcontactcharx.client import (
     _ascii,
     _decode_cp_config,
@@ -34,12 +21,33 @@ from aiophoenixcontactcharx.client import (
     _u64,
     _vehicle_status,
 )
+from aiophoenixcontactcharx.models import (
+    ErrorCode,
+    ModemRegistration,
+    ModemSignalQuality,
+    ReleaseMode,
+    VehicleStatus,
+)
+from aiophoenixcontactcharx.registers import (
+    CP_CFG_COUNT,
+    CP_CHARGING_RELEASE,
+    CP_ERROR_CODE,
+    CP_EVCC_ID,
+    CP_STATUS_COUNT,
+    CP_VEHICLE_STATUS,
+    CP_VOLTAGE_L1,
+    DEVICE_DESIGNATION,
+    GLOBAL_COUNT,
+    MODEM_REGISTRATION,
+    cp_register,
+    offset_of,
+)
 from tests.helpers import cp_cfg_regs, cp_status_regs, global_regs
-
 
 # ---------------------------------------------------------------------------
 # _u32 / _s32
 # ---------------------------------------------------------------------------
+
 
 class TestU32:
     def test_zero(self):
@@ -86,6 +94,7 @@ class TestS32:
 # _u64 / _s64
 # ---------------------------------------------------------------------------
 
+
 class TestU64:
     def test_zero(self):
         assert _u64([0, 0, 0, 0], 0) == 0
@@ -131,6 +140,7 @@ class TestS64:
 # _ascii
 # ---------------------------------------------------------------------------
 
+
 class TestAscii:
     def test_two_chars_per_word(self):
         # "AB" = 0x4142
@@ -167,20 +177,24 @@ class TestAscii:
 # _vehicle_status
 # ---------------------------------------------------------------------------
 
+
 class TestVehicleStatus:
-    @pytest.mark.parametrize("code,expected", [
-        (0x4131, VehicleStatus.A1),
-        (0x4132, VehicleStatus.A2),
-        (0x4231, VehicleStatus.B1),
-        (0x4232, VehicleStatus.B2),
-        (0x4331, VehicleStatus.C1),
-        (0x4332, VehicleStatus.C2),
-        (0x4431, VehicleStatus.D1),
-        (0x4432, VehicleStatus.D2),
-        (0x4530, VehicleStatus.E0),
-        (0x4630, VehicleStatus.F0),
-        (0x494E, VehicleStatus.IN),
-    ])
+    @pytest.mark.parametrize(
+        "code,expected",
+        [
+            (0x4131, VehicleStatus.A1),
+            (0x4132, VehicleStatus.A2),
+            (0x4231, VehicleStatus.B1),
+            (0x4232, VehicleStatus.B2),
+            (0x4331, VehicleStatus.C1),
+            (0x4332, VehicleStatus.C2),
+            (0x4431, VehicleStatus.D1),
+            (0x4432, VehicleStatus.D2),
+            (0x4530, VehicleStatus.E0),
+            (0x4630, VehicleStatus.F0),
+            (0x494E, VehicleStatus.IN),
+        ],
+    )
     def test_all_iec_states(self, code, expected):
         assert _vehicle_status(code) == expected
 
@@ -203,6 +217,7 @@ class TestVehicleStatus:
 # _ip
 # ---------------------------------------------------------------------------
 
+
 class TestIp:
     def test_typical(self):
         assert _ip([192, 168, 1, 100], 0) == "192.168.1.100"
@@ -215,6 +230,7 @@ class TestIp:
 # ---------------------------------------------------------------------------
 # _mac
 # ---------------------------------------------------------------------------
+
 
 class TestMac:
     def test_typical(self):
@@ -234,6 +250,7 @@ class TestMac:
 # _maybe_phase_current
 # ---------------------------------------------------------------------------
 
+
 class TestMaybePhaseCurrentSentinel:
     def test_minus_one_returns_none(self):
         assert _maybe_phase_current([0xFFFF, 0xFFFF], 0) is None
@@ -252,6 +269,7 @@ class TestMaybePhaseCurrentSentinel:
 # ---------------------------------------------------------------------------
 # cp_register
 # ---------------------------------------------------------------------------
+
 
 class TestCpRegister:
     def test_cp1_offset_299(self):
@@ -286,6 +304,7 @@ class TestCpRegister:
 # RegisterDef + offset_of
 # ---------------------------------------------------------------------------
 
+
 class TestRegisterDef:
     def test_global_count_derived(self):
         assert GLOBAL_COUNT == 68
@@ -319,12 +338,18 @@ class TestRegisterDef:
             offset_of(CP_VOLTAGE_L1, CP_VEHICLE_STATUS)
 
     def test_register_def_width_is_positive(self):
-        from aiophoenixcontactcharx.registers import GLOBAL_REGISTERS, CP_CFG_REGISTERS, CP_STATUS_REGISTERS
+        from aiophoenixcontactcharx.registers import (
+            CP_CFG_REGISTERS,
+            CP_STATUS_REGISTERS,
+            GLOBAL_REGISTERS,
+        )
+
         for reg in (*GLOBAL_REGISTERS, *CP_CFG_REGISTERS, *CP_STATUS_REGISTERS):
             assert reg.width >= 1, f"{reg} has non-positive width"
 
     def test_register_def_contiguous_global(self):
         from aiophoenixcontactcharx.registers import GLOBAL_REGISTERS
+
         addr = GLOBAL_REGISTERS[0].address
         for reg in GLOBAL_REGISTERS:
             assert reg.address == addr, f"Gap before {reg}"
@@ -332,6 +357,7 @@ class TestRegisterDef:
 
     def test_register_def_contiguous_cp_cfg(self):
         from aiophoenixcontactcharx.registers import CP_CFG_REGISTERS
+
         addr = CP_CFG_REGISTERS[0].address
         for reg in CP_CFG_REGISTERS:
             assert reg.address == addr, f"Gap before {reg}"
@@ -339,6 +365,7 @@ class TestRegisterDef:
 
     def test_register_def_contiguous_cp_status(self):
         from aiophoenixcontactcharx.registers import CP_STATUS_REGISTERS
+
         addr = CP_STATUS_REGISTERS[0].address
         for reg in CP_STATUS_REGISTERS:
             assert reg.address == addr, f"Gap before {reg}"
@@ -348,6 +375,7 @@ class TestRegisterDef:
 # ---------------------------------------------------------------------------
 # _decode_device_info
 # ---------------------------------------------------------------------------
+
 
 class TestDecodeDeviceInfo:
     def test_designation(self):
@@ -381,10 +409,14 @@ class TestDecodeDeviceInfo:
         assert _decode_device_info(global_regs()).modem_signal_quality == ModemSignalQuality.GOOD
 
     def test_group_active_power(self):
-        assert _decode_device_info(global_regs()).group_active_power_w == pytest.approx(11000.0, rel=1e-3)
+        assert _decode_device_info(global_regs()).group_active_power_w == pytest.approx(
+            11000.0, rel=1e-3
+        )
 
     def test_group_current_l1(self):
-        assert _decode_device_info(global_regs()).group_current_l1_a == pytest.approx(16.0, rel=1e-3)
+        assert _decode_device_info(global_regs()).group_current_l1_a == pytest.approx(
+            16.0, rel=1e-3
+        )
 
     def test_group_current_l2_unknown(self):
         assert _decode_device_info(global_regs()).group_current_l2_a is None
@@ -401,6 +433,7 @@ class TestDecodeDeviceInfo:
 # ---------------------------------------------------------------------------
 # _decode_cp_config
 # ---------------------------------------------------------------------------
+
 
 class TestDecodeCpConfig:
     def test_max_and_min_current(self):
@@ -423,6 +456,7 @@ class TestDecodeCpConfig:
 # ---------------------------------------------------------------------------
 # _decode_cp_status_and_control
 # ---------------------------------------------------------------------------
+
 
 class TestDecodeCpStatusAndControl:
     def test_voltage_l1(self):
@@ -463,7 +497,9 @@ class TestDecodeCpStatusAndControl:
 
     def test_error_code_lower_word_bits(self):
         regs = cp_status_regs()
-        mask = ErrorCode.TEMPERATURE_TOO_HIGH | ErrorCode.RFID_READER_ERROR  # bits 0 and 6, lower word
+        mask = (
+            ErrorCode.TEMPERATURE_TOO_HIGH | ErrorCode.RFID_READER_ERROR
+        )  # bits 0 and 6, lower word
         regs[61] = (int(mask) >> 16) & 0xFFFF
         regs[62] = int(mask) & 0xFFFF
         status, _ = _decode_cp_status_and_control(1, regs)

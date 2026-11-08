@@ -14,35 +14,49 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  tests:
-    name: pytest (Python ${{ matrix.python-version }})
+  lint:
+    name: Lint & type-check
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          python-version: "3.14"
+      - run: uv sync --locked
+      - run: uv run ruff format --check
+      - run: uv run ruff check --output-format=github
+      - run: uv run mypy
+
+  tests:
+    name: pytest (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install -e ".[dev]"
-      - run: pytest tests/ --cov=aiophoenixcontactcharx --cov-report=term-missing
+      - run: uv sync --locked
+      - run: uv run pytest
 
   # The distribution that a release publishes, built but not uploaded, so a broken
-  # pyproject.toml shows up before a release.
+  # pyproject.toml, or metadata PyPI would reject, shows up before a release.
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: "3.13"
-      - run: pip install build
-      - run: python -m build
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - run: uv build
+      - run: uv run --locked --only-group release twine check --strict dist/*
 
   dependency-review:
     if: github.event_name == 'pull_request'
@@ -59,7 +73,7 @@ jobs:
   ci-success:
     name: CI success
     if: always()
-    needs: [tests, build, dependency-review]
+    needs: [lint, tests, build, dependency-review]
     runs-on: ubuntu-latest
     steps:
       - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')

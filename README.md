@@ -10,22 +10,23 @@ Communicates over **Modbus/TCP** (port 502). Supports the full CHARX SEC-3xxx fa
 pip install aiophoenixcontactcharx
 ```
 
-Requires Python 3.11+ and [`pymodbus`](https://pymodbus.readthedocs.io/) ≥ 3.6.
+Requires Python 3.12+ and [`pymodbus`](https://pymodbus.readthedocs.io/) ≥ 3.7.
 
 ## Development
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-pytest tests/
+uv sync
+uv run pytest
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the lint and type checks.
 
 ## Quick start
 
 ```python
 import asyncio
 from aiophoenixcontactcharx import CharxClient
+
 
 async def main():
     async with CharxClient("192.168.1.100") as client:
@@ -40,6 +41,7 @@ async def main():
         print(f"CP1 status: {cp.status.vehicle_status}")
         print(f"CP1 power:  {cp.status.active_power_w:.1f} W")
         print(f"CP1 energy: {cp.status.energy_active_kwh:.3f} kWh")
+
 
 asyncio.run(main())
 ```
@@ -59,7 +61,7 @@ async with CharxClient("192.168.1.100") as client:
 
 ## Register map
 
-See `aiophoenixcontactcharx/registers.py` for all addresses. Full documentation is in the Phoenix Contact manual *UM EN CHARX SEC, Revision 08*, Appendix B3 (p. 167–174).
+See `src/aiophoenixcontactcharx/registers.py` for all addresses. Full documentation is in the Phoenix Contact manual *UM EN CHARX SEC, Revision 08*, Appendix B3 (p. 167–174).
 
 ## Modbus prerequisites
 
