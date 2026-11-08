@@ -30,10 +30,6 @@ jobs:
         id: release
         with:
           token: ${{ steps.app-token.outputs.token }}
-          # No release PR while the 2.0.0 rewrite (#47) lands step by step: a release
-          # in between would put half of 2.0 on PyPI. The step that removes the 1.x
-          # API removes this line, and release-please then proposes 2.0.0.
-          skip-github-pull-request: true
 
   build:
     needs: release-please
