@@ -1,7 +1,12 @@
+import asyncio
 from typing import Any
 
 import pytest
-from modbus_connection.exceptions import IllegalDataAddressError, ModbusConnectionError
+from modbus_connection.exceptions import (
+    IllegalDataAddressError,
+    ModbusConnectionError,
+    ModbusTimeoutError,
+)
 from modbus_connection.mock import MockModbusUnit, WriteEvent
 
 from aiophoenixcontactcharx import (
@@ -102,6 +107,30 @@ async def test_a_write_that_never_lands_raises(controller_unit: MockModbusUnit) 
 
     with pytest.raises(CharxWriteNotConfirmedError, match="dynamic_max_current reads 32"):
         await write_confirmed(group, "dynamic_max_current", 20, confirm_within=0.05, interval=0)
+
+
+async def test_a_stalled_read_is_cut_off_at_the_deadline(
+    controller_unit: MockModbusUnit, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    group = (await updated(controller_unit)).group
+
+    async def stall(*, notify: bool = True) -> None:  # noqa: ARG001
+        await asyncio.sleep(10)
+
+    monkeypatch.setattr(group, "async_update", stall)
+
+    with pytest.raises(CharxWriteNotConfirmedError):
+        await write_confirmed(group, "dynamic_max_current", 20, confirm_within=0.05)
+
+
+async def test_a_modbus_timeout_of_a_read_stays_a_modbus_timeout(
+    controller_unit: MockModbusUnit,
+) -> None:
+    group = (await updated(controller_unit)).group
+    controller_unit.fail_read(152, ModbusTimeoutError("slow"))
+
+    with pytest.raises(ModbusTimeoutError):
+        await write_confirmed(group, "dynamic_max_current", 20, confirm_within=5)
 
 
 async def test_a_rejected_value_writes_nothing(controller_unit: MockModbusUnit) -> None:
@@ -254,6 +283,20 @@ async def test_the_digital_outputs_need_four_states(controller_unit: MockModbusU
 
     with pytest.raises(ValueError, match="give 4 states"):
         await cp.set_digital_outputs(DigitalOutputState.LOW)
+
+
+@pytest.mark.parametrize("bad", [16, 1, True, "LOW"])
+async def test_every_output_state_must_be_a_digital_output_state(
+    controller_unit: MockModbusUnit, bad: object
+) -> None:
+    cp = (await updated(controller_unit)).charging_points[0]
+    events = recorded(controller_unit)
+    low = DigitalOutputState.LOW
+
+    with pytest.raises(TypeError, match="must be a DigitalOutputState"):
+        await cp.set_digital_outputs(bad, low, low, low)  # type: ignore[arg-type]
+
+    assert events == []
 
 
 async def test_none_disables_the_watchdog(controller_unit: MockModbusUnit) -> None:

@@ -327,11 +327,16 @@ class ChargingPoint(Component):
     async def set_digital_outputs(self, *outputs: DigitalOutputState) -> None:
         """Set the four digital outputs, output 1 first.
 
-        Raises ``ValueError`` unless exactly four states are given.
+        Raises ``ValueError`` unless exactly four states are given, and ``TypeError`` for
+        one that isn't a ``DigitalOutputState``; nothing is written then.
         """
         if len(outputs) != DIGITAL_OUTPUTS:
             msg = f"give {DIGITAL_OUTPUTS} states, output 1 first; got {len(outputs)}"
             raise ValueError(msg)
+        for state in outputs:
+            if not isinstance(state, DigitalOutputState):
+                msg = f"an output state must be a DigitalOutputState, got {state!r}"
+                raise TypeError(msg)
         word = sum(int(state) << (4 * n) for n, state in enumerate(outputs))
         await write_confirmed(self, "digital_outputs", word)
 

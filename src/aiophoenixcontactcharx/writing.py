@@ -7,7 +7,6 @@ written value.
 """
 
 import asyncio
-import time
 from collections.abc import Callable
 from typing import Any, Final
 
@@ -92,18 +91,23 @@ async def write_confirmed(  # noqa: PLR0913
     if expected is _SAME:
         expected = value
     await component.write(field, value)
-    deadline = time.monotonic() + confirm_within
-    while True:
-        await component.async_update()
-        if getattr(component, field) == expected:
-            return
-        if time.monotonic() >= deadline:
-            msg = (
-                f"{field} reads {getattr(component, field)!r} {confirm_within} s after writing "
-                f"{value!r}; the controller didn't apply the write"
-            )
-            raise CharxWriteNotConfirmedError(msg)
-        await asyncio.sleep(interval)
+    # One deadline over every read and pause, so a read that stalls can't stretch it.
+    deadline = asyncio.timeout(confirm_within)
+    try:
+        async with deadline:
+            while True:
+                await component.async_update()
+                if getattr(component, field) == expected:
+                    return
+                await asyncio.sleep(interval)
+    except TimeoutError:
+        if not deadline.expired():
+            raise  # a timeout of the Modbus read itself
+        msg = (
+            f"{field} reads {getattr(component, field)!r} {confirm_within} s after writing "
+            f"{value!r}; the controller didn't apply the write"
+        )
+        raise CharxWriteNotConfirmedError(msg) from None
 
 
 async def write_command(unit: ModbusUnit, address: int, value: int = 1) -> None:
