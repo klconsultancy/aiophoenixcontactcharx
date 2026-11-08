@@ -18,7 +18,7 @@ PRs are squash-merged and the PR title becomes the commit on `main`, so the titl
 
 ## Tooling
 
-uv manages the environment (`uv sync`, `uv run pytest`); `uv.lock` is committed. The package is in `src/aiophoenixcontactcharx/`. ruff runs with `select = ["ALL"]` and mypy in strict mode. The 1.x modules and their tests are exempt in `pyproject.toml` until the 2.0.0 rewrite (#47) replaces them: when you rewrite a file, drop its line there instead of adding `noqa`s.
+uv manages the environment (`uv sync`, `uv run pytest`); `uv.lock` is committed. The package is in `src/aiophoenixcontactcharx/`. ruff runs with `select = ["ALL"]` and mypy in strict mode. Coverage must stay at 100 % (`fail_under`).
 
 ## Design
 

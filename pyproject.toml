@@ -23,7 +23,6 @@ classifiers = [
 ]
 dependencies = [
     "modbus-connection>=4.12.3",
-    "pymodbus>=3.7.0",
 ]
 
 
@@ -80,24 +79,11 @@ ignore = [
     "PLR2004", # magic values are expected in assertions
     "S101",    # assert is how pytest works
 ]
-# The 1.x code, which the 2.0.0 rewrite (#47) replaces file by file. New code, and every
-# file the rewrite touches, follows the full rule set: drop its line here.
-"src/aiophoenixcontactcharx/client.py" = ["ALL"]
-"src/aiophoenixcontactcharx/models.py" = ["ALL"]
-"src/aiophoenixcontactcharx/registers.py" = ["ALL"]
-"tests/helpers.py" = ["ALL"]
-"tests/test_client.py" = ["ALL"]
-"tests/test_decoding.py" = ["ALL"]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
 files = ["src", "tests"]
-
-# The 1.x tests, which the 2.0.0 rewrite (#47) replaces; like their ruff exemption above.
-[[tool.mypy.overrides]]
-module = ["tests.helpers", "tests.test_client", "tests.test_decoding"]
-ignore_errors = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -110,6 +96,7 @@ branch = true
 source = ["aiophoenixcontactcharx"]
 
 [tool.coverage.report]
+fail_under = 100
 show_missing = true
 skip_covered = true
 

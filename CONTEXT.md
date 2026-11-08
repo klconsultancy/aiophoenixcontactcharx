@@ -16,9 +16,9 @@ _Avoid_: charger, EVSE, outlet ("Charge Point" appears only in WBM breadcrumb na
 
 ### Data
 
-**Snapshot**:
-A complete point-in-time read of all data from one Charging Controller — device-level info plus one record per Charging Point. The Home Assistant coordinator polls for a new Snapshot on each update interval.
-_Avoid_: poll result, data, update
+**Update**:
+One read of a Charging Controller: its identity, its Group and every Charging Point, each read on its own. The **Update Report** names the parts that refreshed and those that failed; a failed part keeps its last values (ADR 0006). The Home Assistant coordinator runs one Update per interval.
+_Avoid_: snapshot, poll result, fetch
 
 ### Authorization
 
