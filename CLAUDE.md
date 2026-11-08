@@ -19,3 +19,7 @@ PRs are squash-merged and the PR title becomes the commit on `main`, so the titl
 ## Tooling
 
 uv manages the environment (`uv sync`, `uv run pytest`); `uv.lock` is committed. The package is in `src/aiophoenixcontactcharx/`. ruff runs with `select = ["ALL"]` and mypy in strict mode. The 1.x modules and their tests are exempt in `pyproject.toml` until the 2.0.0 rewrite (#47) replaces them: when you rewrite a file, drop its line there instead of adding `noqa`s.
+
+## Design
+
+[`docs/design.md`](docs/design.md) describes the 2.0 register map, encoding, reads and public API; keep it current when a choice changes. [`docs/errata.md`](docs/errata.md) records where the manual (transcribed in `docs/protocol/B3-modbus.md`) is wrong or unclear, and how the map reads it. `tests/test_register_map.py` checks the map against that transcription in both directions.

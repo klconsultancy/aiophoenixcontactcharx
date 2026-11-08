@@ -22,6 +22,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
+    "modbus-connection>=4.12.3",
     "pymodbus>=3.7.0",
 ]
 
@@ -31,8 +32,17 @@ Homepage = "https://github.com/klconsultancy/aiophoenixcontactcharx"
 Issues = "https://github.com/klconsultancy/aiophoenixcontactcharx/issues"
 Changelog = "https://github.com/klconsultancy/aiophoenixcontactcharx/blob/main/CHANGELOG.md"
 
+[project.scripts]
+aiophoenixcontactcharx = "aiophoenixcontactcharx.cli:main"
+
+[project.optional-dependencies]
+tmodbus = [
+    "modbus-connection[tmodbus]>=4.12.3",
+]
+
 [dependency-groups]
 dev = [
+    "aiophoenixcontactcharx[tmodbus]",
     "mypy",
     "prek",
     "pytest",
@@ -82,7 +92,12 @@ ignore = [
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["src"]
+files = ["src", "tests"]
+
+# The 1.x tests, which the 2.0.0 rewrite (#47) replaces; like their ruff exemption above.
+[[tool.mypy.overrides]]
+module = ["tests.helpers", "tests.test_client", "tests.test_decoding"]
+ignore_errors = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -97,3 +112,6 @@ source = ["aiophoenixcontactcharx"]
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
+
+[tool.uv.sources]
+aiophoenixcontactcharx = { workspace = true }

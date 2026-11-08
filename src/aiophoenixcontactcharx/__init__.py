@@ -3,6 +3,26 @@
 from importlib.metadata import version
 
 from .client import CharxClient
+from .controller import (
+    MAX_CHARGING_POINTS,
+    ChargingPoint,
+    CharxController,
+    ControllerInfo,
+    Group,
+    charging_point_name,
+)
+from .enums import (
+    ChargingInterface,
+    DigitalOutputState,
+    EnergyMeterType,
+    ErrorCode,
+    ModemRegistration,
+    ModemSignalQuality,
+    OvercurrentMonitoring,
+    ReleaseMode,
+    TempMonitoring,
+    VehicleStatus,
+)
 from .exceptions import (
     CharxConnectionError,
     CharxError,
@@ -18,14 +38,6 @@ from .models import (
     CharxData,
     DeviceInfo,
     DigitalOutputMode,
-    EnergyMeterType,
-    ErrorCode,
-    ModemRegistration,
-    ModemSignalQuality,
-    OvercurrentMonitoring,
-    ReleaseMode,
-    TempMonitoring,
-    VehicleStatus,
     pack_digital_outputs,
 )
 from .registers import RegisterDef, cp_register, offset_of
@@ -33,21 +45,28 @@ from .registers import RegisterDef, cp_register, offset_of
 __version__ = version("aiophoenixcontactcharx")
 
 __all__ = [
+    "MAX_CHARGING_POINTS",
+    "ChargingInterface",
+    "ChargingPoint",
     "ChargingPointConfig",
     "ChargingPointControl",
     "ChargingPointData",
     "ChargingPointStatus",
     "CharxClient",
     "CharxConnectionError",
+    "CharxController",
     "CharxData",
     "CharxError",
     "CharxInvalidDataError",
     "CharxModbusError",
     "CharxTimeoutError",
+    "ControllerInfo",
     "DeviceInfo",
     "DigitalOutputMode",
+    "DigitalOutputState",
     "EnergyMeterType",
     "ErrorCode",
+    "Group",
     "ModemRegistration",
     "ModemSignalQuality",
     "OvercurrentMonitoring",
@@ -55,6 +74,7 @@ __all__ = [
     "ReleaseMode",
     "TempMonitoring",
     "VehicleStatus",
+    "charging_point_name",
     "cp_register",
     "offset_of",
     "pack_digital_outputs",
