@@ -18,6 +18,34 @@ follows the manual.
 each, which is floating in the manual's coding (the state of an output nothing drives)
 and low in 1.x's.
 
+## 167: writable in OCPP release mode, applied late, echoed wrong
+
+The manual gives the Dynamic Max Current as R/W without a condition. A test on the dumped
+controller (OCPP release mode, no vehicle) wrote 16 and restored 65535 with function
+code 06 (write single register):
+
+- **The write works in OCPP release mode.** Load management can limit the current
+  while an OCPP backend authorizes the sessions.
+- **The controller applies it within about 2 s.** A read straight after the write
+  still returns the old value.
+- **Its response echoes the old value, not the written one.** Modbus requires a function
+  code 06 response to echo the request, so `modbus_connection` raises
+  `ModbusProtocolError` ("Expected response to match request") although the write
+  lands.
+
+The write API therefore writes with function code 16 (write multiple registers,
+`force_fc16=True`), whose response echoes only the address and the count, and reads the
+register back until the value has landed. Whether the controller answers function code
+16 correctly is not yet tested.
+
+## x300, x303, x304: writable only in the matching release mode
+
+The manual makes charging release (x300) and availability (x304) writable only when the
+Charging Point is set to release via Modbus, and locking (x303) only when it is set to
+external control. The maximum current (x301), the watchdog (x306, x307) and the Dynamic
+Max Current (167) have no condition. Writing x300, x303 or x304 is not tested: the
+dumped controller has to stay in OCPP release mode for its operator.
+
 ## 114: Charging Controllers, read as Charging Points
 
 Register 114 counts the Charging Controllers of the system, on the backplane bus and over
