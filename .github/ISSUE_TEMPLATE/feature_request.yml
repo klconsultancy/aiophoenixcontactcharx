@@ -1,0 +1,15 @@
+name: Feature request
+description: Read or write a register, or support a controller, that the library doesn't yet.
+labels: [enhancement, needs-triage]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you need
+      description: The value or control you're after, and which registers of the CHARX Modbus map it uses, if you know.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: How the library should expose it

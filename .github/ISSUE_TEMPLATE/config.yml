@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/klconsultancy/aiophoenixcontactcharx/security/advisories/new
+    about: Report vulnerabilities privately, not in a public issue.
+  - name: A problem with the Home Assistant integration
+    url: https://github.com/klconsultancy/haphoenixcontactcharx/issues/new/choose
+    about: Entities, the config flow and anything else in Home Assistant belong to the integration's repository.
