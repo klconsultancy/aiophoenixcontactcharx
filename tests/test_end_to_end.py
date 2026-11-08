@@ -92,10 +92,11 @@ async def test_dump_command_reads_the_controller_over_tcp(
     }
 
 
-async def test_a_refused_register_fails_only_its_charging_point() -> None:
+async def test_a_refused_register_is_left_out_over_tcp() -> None:
     # A firmware that lacks x262 (SOC) on Charging Point 2.
     holding = dict(SYNTHETIC["registers"]["holding"])
     del holding["2262"]
+    del holding["2263"]
     port = free_port()
     server = AsyncTcpServer("127.0.0.1", router_for(holding), port=port)
     await server.start()
@@ -105,10 +106,9 @@ async def test_a_refused_register_fails_only_its_charging_point() -> None:
         controller = CharxController(connection.for_unit(cli.UNIT_ID))
         report = await controller.async_update()
 
-        # Leaving out the refused field comes with step 4 of #47; until then the whole
-        # Charging Point fails, and only that one.
-        assert set(report.failed) == {"charging_point_2"}
-        assert "charging_point_1" in report.updated
+        assert report.complete
+        assert controller.charging_points[1].soc_energy is None
+        assert controller.charging_points[1].vehicle_status is VehicleStatus.A1
     finally:
         await connection.close()
         await server.stop()

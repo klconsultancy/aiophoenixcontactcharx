@@ -99,8 +99,24 @@ controller.charging_points[0].vehicle_status
   and returns the `UpdateReport` of `Device.async_poll` (ADR 0006): a part whose read
   fails is in `report.failed` and keeps its last values. It raises
   `ModbusConnectionError` when the link is down, and `ModbusTimeoutError` when nothing
-  has answered yet. Leaving out a register a controller refuses, instead of failing its
-  part, comes next (#47).
+  has answered yet.
+- A register the controller refuses (illegal data address or illegal function: Modbus
+  exception code 2 or 1) doesn't take its part down. On such a refusal `async_update()`
+  reads each field of that part on its own, once, leaves out the fields the controller
+  refuses (`restrict_fields`: they read `None`, with a warning naming the register and
+  the field, or one warning if it refuses the whole part), and reads the part again in
+  the same update. Its read ranges split around the left-out registers, so later updates
+  don't touch them. Any other error still fails the part; one during the search fails
+  only the part too, and the next update searches again. A lost connection raises.
+  `Device.async_poll()` itself only records a refusal; this search is the library's, as
+  in python-thermia-genesis.
+- A left-out register is tried again after `retry_refused_after` (an hour by default),
+  each on its own, before that update's poll. One that answers again is put back with an
+  info log: its part becomes a new instance under the same name, since `restrict_fields`
+  can't be undone. So a caller looks a part up on the controller on every use
+  (`controller.charging_points`, `getattr(controller, name)`) rather than keeping a
+  reference to one. A register still refused waits for the next interval; once nothing
+  is left out, the tries stop.
 - `ChargingPoint` derives `is_connected`, `is_charging`, `has_error`, `is_unavailable` and
   `watchdog_enabled` from its fields.
 
@@ -112,7 +128,8 @@ controller.charging_points[0].vehicle_status
   the names of its members, an address as text) and `failed`. It never writes to the
   controller.
 - A part whose read fails is left out and listed under `failed`; the JSON is still
-  written and the exit status is 1. A lost connection or a timeout ends the command with
+  written and the exit status is 1. The dump doesn't leave out refused registers: a bug
+  report needs to show the refusal. A lost connection or a timeout ends the command with
   status 1 and no JSON.
 
 ## Tests

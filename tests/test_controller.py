@@ -3,7 +3,7 @@ from typing import assert_type
 
 import pytest
 from modbus_connection.exceptions import (
-    IllegalDataAddressError,
+    IllegalDataValueError,
     ModbusConnectionError,
     ModbusTimeoutError,
 )
@@ -293,7 +293,7 @@ async def test_never_reads_the_command_registers(controller_unit: MockModbusUnit
 async def test_a_failing_charging_point_fails_alone(controller_unit: MockModbusUnit) -> None:
     controller = await updated(controller_unit)
     controller_unit.holding[1297] = 10
-    controller_unit.fail_read(2232, IllegalDataAddressError(3))
+    controller_unit.fail_read(2232, IllegalDataValueError(3))
 
     report = await controller.async_update()
 
@@ -333,10 +333,11 @@ async def test_a_failed_setup_is_retried(controller_unit: MockModbusUnit) -> Non
     assert len(controller.charging_points) == SYNTHETIC["registers"]["holding"]["114"]
 
 
-async def test_a_refused_identity_register_fails_only_the_device_info(
+async def test_a_failing_identity_register_fails_only_the_device_info(
     controller_unit: MockModbusUnit,
 ) -> None:
-    controller_unit.fail_read(145, IllegalDataAddressError(3))
+    # Not a refusal (that is left out, tests/test_refused_registers.py): a failure.
+    controller_unit.fail_read(145, IllegalDataValueError(3))
     controller = CharxController(controller_unit)
 
     report = await controller.async_update()

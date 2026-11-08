@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from modbus_connection.exceptions import (
-    IllegalDataAddressError,
+    IllegalDataValueError,
     ModbusConnectionError,
     ModbusTimeoutError,
 )
@@ -54,10 +54,10 @@ async def test_dump_shows_an_error_code_of_only_unnamed_bits(
     assert dump["values"]["charging_point_2"]["error_code"] == ["0x00000004"]
 
 
-async def test_dump_survives_a_refused_identity_register(
+async def test_dump_survives_a_failing_identity_register(
     controller_unit: MockModbusUnit,
 ) -> None:
-    controller_unit.fail_read(145, IllegalDataAddressError(3))
+    controller_unit.fail_read(145, IllegalDataValueError(3))
 
     dump = await cli.dump(controller_unit)
 
@@ -75,7 +75,7 @@ async def test_dump_reads_only_mapped_addresses(controller_unit: MockModbusUnit)
 async def test_dump_lists_a_failed_part_and_keeps_the_rest(
     controller_unit: MockModbusUnit,
 ) -> None:
-    controller_unit.fail_read(2232, IllegalDataAddressError(3))
+    controller_unit.fail_read(2232, IllegalDataValueError(3))
 
     dump = await cli.dump(controller_unit)
 
@@ -130,7 +130,7 @@ def test_main_writes_the_dump_to_a_file(tmp_path: Path) -> None:
 def test_main_exits_1_when_a_part_failed(
     connection: MockModbusConnection, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    connection.for_unit(cli.UNIT_ID).fail_read(1232, IllegalDataAddressError(3))
+    connection.for_unit(cli.UNIT_ID).fail_read(1232, IllegalDataValueError(3))
 
     assert cli.main(["dump", "192.168.1.50"]) == 1
 
