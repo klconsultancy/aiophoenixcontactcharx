@@ -35,16 +35,22 @@ code 06 (write single register):
 
 The write API therefore writes with function code 16 (write multiple registers,
 `force_fc16=True`), whose response echoes only the address and the count, and reads the
-register back until the value has landed. Whether the controller answers function code
-16 correctly is not yet tested.
+register back until the value has landed.
 
-## x300, x303, x304: writable only in the matching release mode
+**Confirmed on the dumped controller:** a function code 16 write of 16 through
+`Group.set_dynamic_max_current` was answered without error and read back after 0.6 s;
+restoring 65535 (`None`) read back after 1.8 s.
+
+## x300, x303, x304: writable only when configured
 
 The manual makes charging release (x300) and availability (x304) writable only when the
-Charging Point is set to release via Modbus, and locking (x303) only when it is set to
-external control. The maximum current (x301), the watchdog (x306, x307) and the Dynamic
-Max Current (167) have no condition. Writing x300, x303 or x304 is not tested: the
-dumped controller has to stay in OCPP release mode for its operator.
+Charging Point is set to release via Modbus, which x120 shows: the library refuses those
+writes in any other release mode. It makes locking (x303) writable only when the locking
+is set to external control, and enforcing unlocking (x305) only when it isn't; no
+register shows that setting, so the library writes them unchecked. The maximum current
+(x301), the watchdog (x306, x307) and the Dynamic Max Current (167) have no condition.
+Writing x300, x303, x304 or x305 is not tested: the dumped controller has to stay in OCPP
+release mode for its operator.
 
 ## 114: Charging Controllers, read as Charging Points
 

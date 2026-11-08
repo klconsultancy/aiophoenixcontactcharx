@@ -36,6 +36,7 @@ from modbus_connection.model.fields import Eui48Field
 
 from .enums import (
     ChargingInterface,
+    DigitalOutputState,
     EnergyMeterType,
     ErrorCode,
     ModemRegistration,
@@ -46,6 +47,14 @@ from .enums import (
     VehicleStatus,
 )
 from .fields import IPv4OctetsField, VehicleStatusField
+from .writing import (
+    CharxReleaseModeError,
+    a_bool,
+    current_amps,
+    register_value,
+    write_command,
+    write_confirmed,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -68,6 +77,13 @@ REFUSALS: Final = (IllegalDataAddressError, IllegalFunctionError)
 
 # How long a left-out register stays out before it is tried again, in seconds.
 RETRY_REFUSED_AFTER: Final = 3600.0
+
+# The digital outputs of a Charging Point (x302, 4 bits each).
+DIGITAL_OUTPUTS: Final = 4
+# The command registers: restart the server, restart the group, clear the last RFID UID.
+RESET: Final = 165
+SYSTEM_RESET: Final = 166
+CLEAR_RFID: Final = 308
 
 # What the Dynamic Max Current (167) reads while no limit is set.
 NOT_SET: Final = 0xFFFF
@@ -124,9 +140,33 @@ class Group(Component):
     current_l3 = int32(162, scale=MILLI, nan=_MINUS_ONE_32, unit="A")
 
     # Controls
-    available = boolean(164)
+    available = boolean(164, writable=a_bool, force_fc16=True)
     # 65535 while no dynamic limit is set (docs/errata.md), which reads None.
-    dynamic_max_current = integer(167, signed=False, nan=NOT_SET, unit="A")
+    dynamic_max_current = integer(
+        167, signed=False, nan=NOT_SET, unit="A", writable=register_value, force_fc16=True
+    )
+
+    async def set_available(self, available: bool) -> None:  # noqa: FBT001
+        """Put every Charging Controller of the group in service, or into status F.
+
+        The manual makes it writable "if configured"; a controller that isn't refuses it.
+        """
+        await write_confirmed(self, "available", available)
+
+    async def set_dynamic_max_current(self, amps: int | None) -> None:
+        """Limit the group's charging current to ``amps`` (load management), or clear it.
+
+        ``None`` clears the limit (writes 65535). Works in every release mode; tested in
+        OCPP release mode (docs/errata.md). Raises ``ValueError`` for an amps outside
+        0-65534.
+        """
+        if amps is None:
+            await write_confirmed(self, "dynamic_max_current", NOT_SET, expected=None)
+            return
+        if amps == NOT_SET:
+            msg = "pass None to clear the limit, not 65535"
+            raise ValueError(msg)
+        await write_confirmed(self, "dynamic_max_current", amps)
 
 
 class ChargingPoint(Component):
@@ -194,14 +234,15 @@ class ChargingPoint(Component):
     vehicle_status = VehicleStatusField(299)
 
     # Controls: x300 to x307
-    charging_release = boolean(300)
-    max_current = integer(301, signed=False, unit="A")
-    digital_outputs = raw_register(302)  # 4 bits per output; see DigitalOutputState
-    locked = boolean(303)
-    available = boolean(304)
-    force_unlock = boolean(305)
-    watchdog_current = integer(306, signed=False, unit="A")
-    watchdog_timer = integer(307, signed=False, unit="s")
+    charging_release = boolean(300, writable=a_bool, force_fc16=True)
+    max_current = integer(301, signed=False, unit="A", writable=current_amps, force_fc16=True)
+    # 4 bits per output; see DigitalOutputState and set_digital_outputs.
+    digital_outputs = raw_register(302, writable=register_value, force_fc16=True)
+    locked = boolean(303, writable=a_bool, force_fc16=True)
+    available = boolean(304, writable=a_bool, force_fc16=True)
+    force_unlock = boolean(305, writable=a_bool, force_fc16=True)
+    watchdog_current = integer(306, signed=False, unit="A", writable=current_amps, force_fc16=True)
+    watchdog_timer = integer(307, signed=False, unit="s", writable=register_value, force_fc16=True)
 
     @property
     def number(self) -> int:
@@ -239,6 +280,93 @@ class ChargingPoint(Component):
         if self.watchdog_timer is None:
             return None
         return self.watchdog_timer != WATCHDOG_DISABLED
+
+    # -- controls --------------------------------------------------------------------
+
+    def _require_modbus_release(self, what: str) -> None:
+        """Raise ``CharxReleaseModeError`` unless the release mode is Modbus."""
+        mode = self.release_mode
+        if mode is not ReleaseMode.MODBUS:
+            state = "an unread release mode" if mode is None else f"release mode {mode.name}"
+            msg = f"{what} needs release mode MODBUS; Charging Point {self.number} is in {state}"
+            raise CharxReleaseModeError(msg)
+
+    async def set_charging_release(self, enabled: bool) -> None:  # noqa: FBT001
+        """Release charging for a connected vehicle, or withdraw the release.
+
+        Needs release mode Modbus: raises ``CharxReleaseModeError`` otherwise, also
+        while the release mode is unread.
+        """
+        self._require_modbus_release("charging release")
+        await write_confirmed(self, "charging_release", enabled)
+
+    async def set_available(self, available: bool) -> None:  # noqa: FBT001
+        """Put the Charging Point in service, or into status F (aborts a session).
+
+        Needs release mode Modbus: raises ``CharxReleaseModeError`` otherwise.
+        """
+        self._require_modbus_release("availability")
+        await write_confirmed(self, "available", available)
+
+    async def set_max_current(self, amps: int) -> None:
+        """Set the maximum charging current, 6-80 A.
+
+        Raises ``ValueError`` outside 6-80: the controller would withdraw the charging
+        release. Whether it takes effect outside release mode Modbus is unverified.
+        """
+        await write_confirmed(self, "max_current", amps)
+
+    async def set_locked(self, locked: bool) -> None:  # noqa: FBT001
+        """Lock or unlock the connector.
+
+        The manual needs the locking set to external control, which no register shows;
+        a controller that isn't refuses or ignores it.
+        """
+        await write_confirmed(self, "locked", locked)
+
+    async def set_digital_outputs(self, *outputs: DigitalOutputState) -> None:
+        """Set the four digital outputs, output 1 first.
+
+        Raises ``ValueError`` unless exactly four states are given, and ``TypeError`` for
+        one that isn't a ``DigitalOutputState``; nothing is written then.
+        """
+        if len(outputs) != DIGITAL_OUTPUTS:
+            msg = f"give {DIGITAL_OUTPUTS} states, output 1 first; got {len(outputs)}"
+            raise ValueError(msg)
+        for state in outputs:
+            if not isinstance(state, DigitalOutputState):
+                msg = f"an output state must be a DigitalOutputState, got {state!r}"
+                raise TypeError(msg)
+        word = sum(int(state) << (4 * n) for n, state in enumerate(outputs))
+        await write_confirmed(self, "digital_outputs", word)
+
+    async def set_watchdog_current(self, amps: int) -> None:
+        """Set the charging current the watchdog falls back to, 6-80 A."""
+        await write_confirmed(self, "watchdog_current", amps)
+
+    async def set_watchdog_timer(self, seconds: int | None) -> None:
+        """Set the watchdog's interval in seconds, or disable it with ``None``.
+
+        Writing again within the interval resets the timer. Raises ``ValueError`` for
+        seconds outside 0-65534.
+        """
+        if seconds == WATCHDOG_DISABLED:
+            msg = "pass None to disable the watchdog, not 65535"
+            raise ValueError(msg)
+        value = WATCHDOG_DISABLED if seconds is None else seconds
+        await write_confirmed(self, "watchdog_timer", value)
+
+    async def enforce_unlocking(self) -> None:
+        """Unlock the connector, when the locking isn't set to external control.
+
+        A command: nothing is read back, since x305 doesn't hold a state (it reads 1 on
+        an idle controller, docs/errata.md).
+        """
+        await self.write("force_unlock", True)  # noqa: FBT003
+
+    async def clear_last_rfid(self) -> None:
+        """Clear the last RFID UID (x275). A command: nothing is read back."""
+        await write_command(self.modbus_unit, self.number * CHARGING_POINT_STRIDE + CLEAR_RFID)
 
 
 class _ChargingControllerCount(Component):
@@ -296,6 +424,20 @@ class CharxController(Device):
             "group",
             *(charging_point_name(cp.number) for cp in self._charging_points),
         )
+
+    async def reset(self) -> None:
+        """Restart the server, this Charging Controller (register 165).
+
+        A command: the connection drops while it restarts.
+        """
+        await write_command(self.modbus_unit, RESET)
+
+    async def system_reset(self) -> None:
+        """Restart every Charging Controller of the group (register 166).
+
+        A command: the connection drops while they restart.
+        """
+        await write_command(self.modbus_unit, SYSTEM_RESET)
 
     async def _async_setup(self) -> None:
         """Place a Charging Point per Charging Controller.
