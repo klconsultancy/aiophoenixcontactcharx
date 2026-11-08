@@ -110,6 +110,13 @@ controller.charging_points[0].vehicle_status
   only the part too, and the next update searches again. A lost connection raises.
   `Device.async_poll()` itself only records a refusal; this search is the library's, as
   in python-thermia-genesis.
+- A left-out register is tried again after `retry_refused_after` (an hour by default),
+  each on its own, before that update's poll. One that answers again is put back with an
+  info log: its part becomes a new instance under the same name, since `restrict_fields`
+  can't be undone. So a caller looks a part up on the controller on every use
+  (`controller.charging_points`, `getattr(controller, name)`) rather than keeping a
+  reference to one. A register still refused waits for the next interval; once nothing
+  is left out, the tries stop.
 - `ChargingPoint` derives `is_connected`, `is_charging`, `has_error`, `is_unavailable` and
   `watchdog_enabled` from its fields.
 

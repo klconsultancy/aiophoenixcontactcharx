@@ -7,7 +7,8 @@ controller differs from the manual.
 """
 
 import logging
-from typing import Final
+import time
+from typing import TYPE_CHECKING, Final
 
 from modbus_connection import ModbusUnit
 from modbus_connection.exceptions import (
@@ -46,6 +47,9 @@ from .enums import (
 )
 from .fields import IPv4OctetsField, VehicleStatusField
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 _LOGGER = logging.getLogger(__name__)
 
 #: The most Charging Points one Charging Controller hosts: its own and 11 SEC-1000s.
@@ -61,6 +65,9 @@ _MINUS_ONE_32: Final = 0xFFFF_FFFF
 WATCHDOG_DISABLED: Final = 65535
 # A read the controller refuses because it lacks the register, as opposed to a failure.
 REFUSALS: Final = (IllegalDataAddressError, IllegalFunctionError)
+
+# How long a left-out register stays out before it is tried again, in seconds.
+RETRY_REFUSED_AFTER: Final = 3600.0
 
 # What the Dynamic Max Current (167) reads while no limit is set.
 NOT_SET: Final = 0xFFFF
@@ -254,12 +261,27 @@ class CharxController(Device):
     (register 114) and places one Charging Point for each, up to 12.
     """
 
-    def __init__(self, unit: ModbusUnit) -> None:
-        """Map the controller on ``unit``; nothing is read until ``async_update()``."""
+    def __init__(
+        self, unit: ModbusUnit, *, retry_refused_after: float = RETRY_REFUSED_AFTER
+    ) -> None:
+        """Map the controller on ``unit``; nothing is read until ``async_update()``.
+
+        ``retry_refused_after`` is how long, in seconds, a register the controller refused
+        stays left out before an update tries it again (default an hour). Raises
+        ``ValueError`` if it isn't positive.
+        """
+        if retry_refused_after <= 0:
+            msg = f"retry_refused_after must be positive, got {retry_refused_after}"
+            raise ValueError(msg)
         super().__init__(unit)
         self.device_info = ControllerInfo(unit)
         self.group = Group(unit)
         self._charging_points: tuple[ChargingPoint, ...] = ()
+        self._retry_refused_after = retry_refused_after
+        # Per part, the fields left out because the controller refused them.
+        self._left_out: dict[str, list[str]] = {}
+        self._next_retry: float | None = None
+        self._clock: Callable[[], float] = time.monotonic
 
     @property
     def charging_points(self) -> tuple[ChargingPoint, ...]:
@@ -312,12 +334,15 @@ class CharxController(Device):
         part: the part's fields are read one by one, once, the refused ones are left out
         (they read ``None``, with a warning naming each register), and the part is read
         again in the same update. Any other error during that search fails only the part,
-        and the next update searches again.
+        and the next update searches again. A left-out register is tried again once
+        ``retry_refused_after`` has passed, so a refusal that was temporary heals.
 
         Raises ``ModbusConnectionError`` when the link is down and ``ModbusTimeoutError``
         when nothing answers, like ``Device.async_poll``.
         """
         await self.async_ensure_setup()
+        if self._next_retry is not None and self._clock() >= self._next_retry:
+            await self._retry_left_out()
         report = await self.async_poll(self.names)
         refused = [name for name, err in report.failed.items() if isinstance(err, REFUSALS)]
         retry = []
@@ -368,10 +393,58 @@ class CharxController(Device):
                 return err  # nothing is left out on a partial search
             else:
                 kept.append(field)
+        if not refused:
+            return None  # every field answers on its own
         if not kept:
             _LOGGER.warning("The controller refuses every register of %s; reading it as None", name)
         else:
             for description in refused:
                 _LOGGER.warning("The controller refuses %s; reading it as None", description)
         part.restrict_fields(kept)
+        self._left_out[name] = [field for field in part.declared_fields if field not in kept]
+        if self._next_retry is None:
+            self._next_retry = self._clock() + self._retry_refused_after
         return None
+
+    async def _retry_left_out(self) -> None:
+        """Read each left-out field on its own again; put back the ones that answer.
+
+        A part that gets a field back is replaced by a new instance under the same name,
+        since ``restrict_fields`` can't be undone; the poll that follows reads it. Any
+        error but a lost connection keeps the field out until the next try.
+        """
+        for name, left_out in list(self._left_out.items()):
+            back: list[str] = []
+            for field in left_out:
+                probe = self._fresh(name)
+                probe.restrict_fields([field])
+                try:
+                    await probe.async_update(notify=False)
+                except ModbusConnectionError:
+                    raise
+                except ModbusError:
+                    continue
+                back.append(field)
+                address = probe.resolved_fields[field].address
+                _LOGGER.info(
+                    "The controller answers register %d (%s.%s) again", address, name, field
+                )
+            if not back:
+                continue
+            still_out = [field for field in left_out if field not in back]
+            part = self._fresh(name)
+            if still_out:
+                part.restrict_fields([f for f in part.declared_fields if f not in still_out])
+                self._left_out[name] = still_out
+            else:
+                del self._left_out[name]
+            self._replace(name, part)
+        self._next_retry = self._clock() + self._retry_refused_after if self._left_out else None
+
+    def _replace(self, name: str, part: Component) -> None:
+        """Put ``part`` in place of the part named ``name``."""
+        setattr(self, name, part)
+        if isinstance(part, ChargingPoint):
+            self._charging_points = tuple(
+                part if cp.number == part.number else cp for cp in self._charging_points
+            )
