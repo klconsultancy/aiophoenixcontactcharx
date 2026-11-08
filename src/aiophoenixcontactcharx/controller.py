@@ -10,6 +10,12 @@ import logging
 from typing import Final
 
 from modbus_connection import ModbusUnit
+from modbus_connection.exceptions import (
+    IllegalDataAddressError,
+    IllegalFunctionError,
+    ModbusConnectionError,
+    ModbusError,
+)
 from modbus_connection.model import (
     Component,
     Device,
@@ -53,6 +59,9 @@ MILLI: Final = 0.001
 _MINUS_ONE_32: Final = 0xFFFF_FFFF
 # A watchdog timer of 65535 s disables the watchdog (x307).
 WATCHDOG_DISABLED: Final = 65535
+# A read the controller refuses because it lacks the register, as opposed to a failure.
+REFUSALS: Final = (IllegalDataAddressError, IllegalFunctionError)
+
 # What the Dynamic Max Current (167) reads while no limit is set.
 NOT_SET: Final = 0xFFFF
 
@@ -297,9 +306,67 @@ class CharxController(Device):
         """Read the identity, the Group and every Charging Point, each on its own.
 
         The first call also places the Charging Points. The report names each part that
-        refreshed and each that failed; a failed part keeps its last values. Raises
-        ``ModbusConnectionError`` when the link is down and ``ModbusTimeoutError`` when
-        nothing answers, like ``Device.async_poll``.
+        refreshed and each that failed; a failed part keeps its last values.
+
+        A register the controller refuses (illegal address or function) doesn't fail its
+        part: the part's fields are read one by one, once, the refused ones are left out
+        (they read ``None``, with a warning naming each register), and the part is read
+        again in the same update. Any other error during that search fails only the part,
+        and the next update searches again.
+
+        Raises ``ModbusConnectionError`` when the link is down and ``ModbusTimeoutError``
+        when nothing answers, like ``Device.async_poll``.
         """
         await self.async_ensure_setup()
-        return await self.async_poll(self.names)
+        report = await self.async_poll(self.names)
+        refused = [name for name, err in report.failed.items() if isinstance(err, REFUSALS)]
+        retry = []
+        for name in refused:
+            error = await self._leave_out_refused_fields(name)
+            if error is None:
+                del report.failed[name]
+                retry.append(name)
+            else:
+                report.failed[name] = error
+        if retry:
+            await self.async_poll(retry, report)
+        return report
+
+    def _fresh(self, name: str) -> Component:
+        """Build a new, unread instance of part ``name``, at the same addresses."""
+        part: Component = getattr(self, name)
+        if isinstance(part, ChargingPoint):
+            return ChargingPoint(
+                self.modbus_unit, part.number, base_offset=part.number * CHARGING_POINT_STRIDE
+            )
+        return type(part)(self.modbus_unit)
+
+    async def _leave_out_refused_fields(self, name: str) -> ModbusError | None:
+        """Read each field of part ``name`` on its own and leave out those refused.
+
+        Returns the error that stopped the search, or ``None``. A lost connection
+        propagates.
+        """
+        part: Component = getattr(self, name)
+        kept: list[str] = []
+        refused: list[str] = []
+        for field, resolved in part.resolved_fields.items():
+            probe = self._fresh(name)
+            probe.restrict_fields([field])
+            try:
+                await probe.async_update(notify=False)
+            except ModbusConnectionError:
+                raise
+            except REFUSALS:
+                refused.append(f"register {resolved.address} ({name}.{field})")
+            except ModbusError as err:
+                return err  # nothing is left out on a partial search
+            else:
+                kept.append(field)
+        if not kept:
+            _LOGGER.warning("The controller refuses every register of %s; reading it as None", name)
+        else:
+            for description in refused:
+                _LOGGER.warning("The controller refuses %s; reading it as None", description)
+        part.restrict_fields(kept)
+        return None
