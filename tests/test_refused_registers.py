@@ -356,3 +356,57 @@ async def test_a_refusal_whose_fields_all_answer_alone_leaves_nothing_out(
     assert report.complete
     assert controller.group.active_power == pytest.approx(7398.0)
     assert controller._left_out == {}  # noqa: SLF001
+
+
+async def test_a_failed_read_after_the_retry_keeps_the_last_values(
+    controller_unit: MockModbusUnit,
+) -> None:
+    controller, clock = await left_out_soc(controller_unit)
+    old = controller.charging_points[1]
+    # x262 answers again, but the part's own read now times out at x300.
+    controller_unit.fail_read(SOC_ENERGY, None)
+    controller_unit.fail_read(2300, ModbusTimeoutError("slow"))
+    clock.now += 60
+
+    report = await controller.async_update()
+
+    assert "charging_point_2" in report.failed
+    cp = controller.charging_points[1]
+    assert cp is old
+    assert cp.vehicle_status is VehicleStatus.A1  # the last values stay
+    # Tried again after another interval, and put back once the part reads.
+    controller_unit.fail_read(2300, None)
+    clock.now += 60
+    report = await controller.async_update()
+    assert report.complete
+    assert controller.charging_points[1] is not old
+    assert controller.charging_points[1].soc_energy == 0
+
+
+async def test_each_left_out_register_keeps_its_own_time(
+    controller_unit: MockModbusUnit,
+) -> None:
+    controller, clock = await left_out_soc(controller_unit)  # x262 out at t=1000
+    clock.now += 59
+    controller_unit.fail_read(2264, IllegalDataAddressError(2))  # x264 out at t=1059
+    await controller.async_update()
+    controller_unit.read_events.clear()
+    clock.now += 1  # t=1060: x262's time, not yet x264's
+
+    await controller.async_update()
+
+    probes = [(e.address, e.count) for e in controller_unit.read_events]
+    assert (SOC_ENERGY, 2) in probes
+    assert (2264, 1) not in probes
+
+
+async def test_a_lost_connection_while_putting_back_raises(
+    controller_unit: MockModbusUnit,
+) -> None:
+    controller, clock = await left_out_soc(controller_unit)
+    controller_unit.fail_read(SOC_ENERGY, None)
+    controller_unit.fail_read(2300, ModbusConnectionError("gone"))
+    clock.now += 60
+
+    with pytest.raises(ModbusConnectionError):
+        await controller.async_update()

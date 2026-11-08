@@ -278,9 +278,9 @@ class CharxController(Device):
         self.group = Group(unit)
         self._charging_points: tuple[ChargingPoint, ...] = ()
         self._retry_refused_after = retry_refused_after
-        # Per part, the fields left out because the controller refused them.
-        self._left_out: dict[str, list[str]] = {}
-        self._next_retry: float | None = None
+        # Per part, the fields left out because the controller refused them, each with the
+        # time it is tried again.
+        self._left_out: dict[str, dict[str, float]] = {}
         self._clock: Callable[[], float] = time.monotonic
 
     @property
@@ -341,7 +341,7 @@ class CharxController(Device):
         when nothing answers, like ``Device.async_poll``.
         """
         await self.async_ensure_setup()
-        if self._next_retry is not None and self._clock() >= self._next_retry:
+        if self._left_out:
             await self._retry_left_out()
         report = await self.async_poll(self.names)
         refused = [name for name, err in report.failed.items() if isinstance(err, REFUSALS)]
@@ -371,6 +371,21 @@ class CharxController(Device):
             )
         return type(part)(self.modbus_unit)
 
+    async def _probe(self, name: str, field: str) -> ModbusError | None:
+        """Read ``field`` of part ``name`` on its own; return the error, or ``None``.
+
+        A lost connection propagates.
+        """
+        probe = self._fresh(name)
+        probe.restrict_fields([field])
+        try:
+            await probe.async_update(notify=False)
+        except ModbusConnectionError:
+            raise
+        except ModbusError as err:
+            return err
+        return None
+
     async def _leave_out_refused_fields(self, name: str) -> ModbusError | None:
         """Read each field of part ``name`` on its own and leave out those refused.
 
@@ -381,65 +396,77 @@ class CharxController(Device):
         kept: list[str] = []
         refused: list[str] = []
         for field, resolved in part.resolved_fields.items():
-            probe = self._fresh(name)
-            probe.restrict_fields([field])
-            try:
-                await probe.async_update(notify=False)
-            except ModbusConnectionError:
-                raise
-            except REFUSALS:
-                refused.append(f"register {resolved.address} ({name}.{field})")
-            except ModbusError as err:
-                return err  # nothing is left out on a partial search
-            else:
+            error = await self._probe(name, field)
+            if error is None:
                 kept.append(field)
+            elif isinstance(error, REFUSALS):
+                refused.append(f"register {resolved.address} ({name}.{field})")
+            else:
+                return error  # nothing is left out on a partial search
         if not refused:
             return None  # every field answers on its own
-        if not kept:
-            _LOGGER.warning("The controller refuses every register of %s; reading it as None", name)
-        else:
+        if kept:
             for description in refused:
                 _LOGGER.warning("The controller refuses %s; reading it as None", description)
+        else:
+            _LOGGER.warning("The controller refuses every register of %s; reading it as None", name)
         part.restrict_fields(kept)
-        self._left_out[name] = [field for field in part.declared_fields if field not in kept]
-        if self._next_retry is None:
-            self._next_retry = self._clock() + self._retry_refused_after
+        retry_at = self._clock() + self._retry_refused_after
+        left_out = self._left_out.setdefault(name, {})
+        for field in part.declared_fields:
+            if field not in kept:
+                # A field left out before keeps its own time.
+                left_out.setdefault(field, retry_at)
         return None
 
     async def _retry_left_out(self) -> None:
-        """Read each left-out field on its own again; put back the ones that answer.
+        """Read each left-out field whose time has come again; put back those that answer.
 
-        A part that gets a field back is replaced by a new instance under the same name,
-        since ``restrict_fields`` can't be undone; the poll that follows reads it. Any
-        error but a lost connection keeps the field out until the next try.
+        Any error but a lost connection keeps a field out for another interval.
         """
+        now = self._clock()
+        later = now + self._retry_refused_after
         for name, left_out in list(self._left_out.items()):
             back: list[str] = []
-            for field in left_out:
-                probe = self._fresh(name)
-                probe.restrict_fields([field])
-                try:
-                    await probe.async_update(notify=False)
-                except ModbusConnectionError:
-                    raise
-                except ModbusError:
-                    continue
-                back.append(field)
-                address = probe.resolved_fields[field].address
-                _LOGGER.info(
-                    "The controller answers register %d (%s.%s) again", address, name, field
-                )
-            if not back:
-                continue
-            still_out = [field for field in left_out if field not in back]
-            part = self._fresh(name)
-            if still_out:
-                part.restrict_fields([f for f in part.declared_fields if f not in still_out])
-                self._left_out[name] = still_out
-            else:
-                del self._left_out[name]
-            self._replace(name, part)
-        self._next_retry = self._clock() + self._retry_refused_after if self._left_out else None
+            for field in [field for field, retry_at in left_out.items() if retry_at <= now]:
+                if await self._probe(name, field) is None:
+                    back.append(field)
+                else:
+                    left_out[field] = later
+            if back and not await self._put_back(name, back):
+                for field in back:
+                    left_out[field] = later
+
+    async def _put_back(self, name: str, back: list[str]) -> bool:
+        """Replace part ``name`` by one that reads ``back`` too; whether that worked.
+
+        ``restrict_fields`` can't be undone, so the part becomes a new instance under the
+        same name. It is read first and replaces the old one only if that read succeeds,
+        so a failure keeps the part's last values. A lost connection propagates.
+        """
+        left_out = self._left_out[name]
+        still_out = [field for field in left_out if field not in back]
+        part = self._fresh(name)
+        if still_out:
+            part.restrict_fields([f for f in part.declared_fields if f not in still_out])
+        try:
+            await part.async_update(notify=False)
+        except ModbusConnectionError:
+            raise
+        except ModbusError:
+            return False
+        for field in back:
+            del left_out[field]
+            _LOGGER.info(
+                "The controller answers register %d (%s.%s) again",
+                part.resolved_fields[field].address,
+                name,
+                field,
+            )
+        if not left_out:
+            del self._left_out[name]
+        self._replace(name, part)
+        return True
 
     def _replace(self, name: str, part: Component) -> None:
         """Put ``part`` in place of the part named ``name``."""
