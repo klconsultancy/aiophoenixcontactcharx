@@ -324,12 +324,17 @@ class CharxController(Device):
         for name in refused:
             error = await self._leave_out_refused_fields(name)
             if error is None:
-                del report.failed[name]
                 retry.append(name)
             else:
                 report.failed[name] = error
         if retry:
+            # The refusals stay in the report until the retry answers: async_poll raises a
+            # timeout only while the report is empty, and a part that times out on the
+            # retry must fail alone rather than end the update.
             await self.async_poll(retry, report)
+            for name in retry:
+                if name in report.updated:
+                    del report.failed[name]
         return report
 
     def _fresh(self, name: str) -> Component:

@@ -132,3 +132,31 @@ async def test_a_failure_that_is_no_refusal_is_not_searched(
     assert set(report.failed) == {"charging_point_2"}
     # One failed read of the status range, no field-by-field search.
     assert sum(1 for event in controller_unit.read_events if event.address >= 2000) == 2
+
+
+async def test_a_timeout_on_the_retry_fails_only_its_part(
+    controller_unit: MockModbusUnit, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Every part refuses a register, so the first poll answers nothing but refusals.
+    for address in (145, 150, 1262, SOC_ENERGY):
+        controller_unit.fail_read(address, IllegalDataAddressError(2))
+    controller = CharxController(controller_unit)
+    await controller.async_ensure_setup()
+    # The retry of device_info, the first part read again, times out.
+    original = controller.device_info.async_update
+    calls = 0
+
+    async def update(*, notify: bool = True) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:  # the retry
+            msg = "slow"
+            raise ModbusTimeoutError(msg)
+        await original(notify=notify)
+
+    monkeypatch.setattr(controller.device_info, "async_update", update)
+
+    report = await controller.async_update()
+
+    assert isinstance(report.failed["device_info"], ModbusTimeoutError)
+    assert report.updated == {"group", "charging_point_1", "charging_point_2"}
