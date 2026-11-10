@@ -7,3 +7,6 @@ dist/
 build/
 *.egg
 .coverage
+
+# graphify knowledge graphs: local, rebuilt on demand
+graphify-out/
