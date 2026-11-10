@@ -18,11 +18,6 @@ pip install "aiophoenixcontactcharx[tmodbus]"
 Requires Python 3.12+. The `tmodbus` extra installs the Modbus backend; leave it out when
 the caller brings its own, as Home Assistant does.
 
-2.0 is a release candidate for now, which pip installs only when asked:
-`pip install --pre "aiophoenixcontactcharx[tmodbus]"` or
-`pip install "aiophoenixcontactcharx[tmodbus]==2.0.0rc1"`. Without that, pip installs
-1.x, whose API this README no longer describes.
-
 ## Reading
 
 ```python
